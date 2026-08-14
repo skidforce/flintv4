@@ -992,16 +992,15 @@ run(function()
 	})
 end)
 
-	run(function()
+run(function()
 	local BlockFly
-	local Value
-	local VerticalValue
+	local Speed
+	local VerticalSpeed
 	local WallCheck
 	local Expand
 	local PlaceDelay
 	local up, down = 0, 0
-	local spoofY = 0
-	local spoofTick = tick()
+	local origWalkSpeed = 16
 
 	local adjacent = {}
 	for x = -3, 3, 3 do
@@ -1086,6 +1085,7 @@ end)
 		Name = 'BlockFly',
 		Function = function(callback)
 			if callback then
+				origWalkSpeed = entitylib.isAlive and entitylib.character.Humanoid.WalkSpeed or 16
 				BlockFly:Clean(inputService.InputBegan:Connect(function(input)
 					if not inputService:GetFocusedTextBox() then
 						if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
@@ -1106,83 +1106,73 @@ end)
 				repeat
 					if entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
 						local root = entitylib.character.RootPart
-						local moveDir = entitylib.character.Humanoid.MoveDirection
-						local dt = task.wait(PlaceDelay.Value)
+						local hum = entitylib.character.Humanoid
+						local moveDir = hum.MoveDirection
 
+						-- set walkspeed for horizontal movement
+						hum.WalkSpeed = math.max(Speed.Value, 16)
+
+						-- place blocks
 						for i = Expand.Value, 1, -1 do
-							local blockPos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0) + moveDir * (i * 3))
+							local blockPos = roundPos(root.Position - Vector3.new(0, hum.HipHeight + 1.5, 0) + moveDir * (i * 3))
 							pcall(placeBlockSmart, blockPos)
 						end
 
-						local realSpeed = math.max(Value.Value, 0)
-						local verticalVelo = (up + down) * VerticalValue.Value
+						-- vertical via JumpPower
+						if up > 0 then
+							hum:ChangeState(Enum.HumanoidStateType.Jumping)
+							root.AssemblyLinearVelocity = Vector3.new(
+								root.AssemblyLinearVelocity.X,
+								math.max(VerticalSpeed.Value, 50),
+								root.AssemblyLinearVelocity.Z
+							)
+						elseif down < 0 then
+							root.AssemblyLinearVelocity = Vector3.new(
+								root.AssemblyLinearVelocity.X,
+								-math.max(VerticalSpeed.Value, 50),
+								root.AssemblyLinearVelocity.Z
+							)
+						end
 
-						-- actual movement via CFrame
-						local rayParams = RaycastParams.new()
-						rayParams.FilterDescendantsInstances = {lplr.Character, gameCamera}
-						rayParams.RespectCanCollide = true
-
-						if moveDir.Magnitude > 0 then
-							local dest = moveDir * realSpeed * dt
-							if WallCheck.Enabled then
-								local ray = workspace:Raycast(root.Position, dest, rayParams)
-								if ray then
-									dest = (ray.Position + ray.Normal) - root.Position
-								end
+						-- wall check: slow down if about to hit
+						if WallCheck.Enabled and moveDir.Magnitude > 0 then
+							local rayParams = RaycastParams.new()
+							rayParams.FilterDescendantsInstances = {lplr.Character, gameCamera}
+							rayParams.RespectCanCollide = true
+							local ray = workspace:Raycast(root.Position, moveDir * 3, rayParams)
+							if ray then
+								hum.WalkSpeed = 0
 							end
-							root.CFrame += dest
 						end
-						root.CFrame += Vector3.new(0, verticalVelo * dt, 0)
-
-						-- spoof velocity: cap horizontal to walkspeed (~16), fake vertical as jump
-						spoofY = spoofY + verticalVelo * dt
-						spoofTick = spoofTick + dt
-						local spoofedX = moveDir.X * math.min(realSpeed, 16)
-						local spoofedZ = moveDir.Z * math.min(realSpeed, 16)
-						-- fake a jump arc when going up
-						if verticalVelo > 0 then
-							spoofedX = moveDir.X * 16
-							spoofedZ = moveDir.Z * 16
-						end
-						-- decay vertical spoof toward 0 like gravity
-						if spoofY > 0.5 then
-							spoofY = spoofY - 196.2 * dt * dt
-						elseif spoofY < 0 then
-							spoofY = 0
-						end
-						root.AssemblyLinearVelocity = Vector3.new(spoofedX, verticalVelo > 0 and 50 or math.clamp(spoofY, -16, 16), spoofedZ)
-					else
-						task.wait(0.1)
 					end
+					task.wait(PlaceDelay.Value)
 				until not BlockFly.Enabled
-		else
-			up, down = 0, 0
-			spoofY = 0
-			spoofTick = tick()
-			if entitylib.isAlive then
-				local root = entitylib.character.RootPart
-				if root then
-					root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			else
+				up, down = 0, 0
+				if entitylib.isAlive then
+					local hum = entitylib.character.Humanoid
+					if hum then
+						hum.WalkSpeed = origWalkSpeed
+					end
 				end
 			end
-		end
 		end,
 		Tooltip = 'Fly while placing blocks below you\nlike scaffold but in the air'
 	})
-	Value = BlockFly:CreateSlider({
+	Speed = BlockFly:CreateSlider({
 		Name = 'Speed',
-		Min = 1,
+		Min = 16,
 		Max = 100,
 		Default = 50,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
-	VerticalValue = BlockFly:CreateSlider({
+	VerticalSpeed = BlockFly:CreateSlider({
 		Name = 'Vertical Speed',
-		Min = 1,
-		Max = 100,
-		Default = 50,
+		Min = 50,
+		Max = 200,
+		Default = 100,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
