@@ -33,6 +33,123 @@ local combatFeint = combatRemotes:WaitForChild('Combat_FeintSwing')
 local combatAttack = combatRemotes:WaitForChild('Combat_RequestAttack')
 local bedWarsRemotes = replicatedStorage:WaitForChild('BedWarsRemotes')
 
+-- ============================================
+-- AUTOSAVE CONFIG
+-- ============================================
+
+-- remove base versions that we replace with enhanced versions
+pcall(function() vape:Remove('Killaura') end)
+pcall(function() vape:Remove('Breaker') end)
+pcall(function() vape:Remove('Speed') end)
+
+do
+	local gameId = game.GameId
+	local configPath = 'flintv4/profiles/'..gameId..'.txt'
+
+	-- load saved config on startup
+	local function loadConfig()
+		if isfile(configPath) then
+			local ok, data = pcall(function()
+				return httpService:JSONDecode(readfile(configPath))
+			end)
+			if ok and data then
+				-- apply saved module states
+				for moduleName, moduleData in pairs(data) do
+					if moduleData and type(moduleData) == 'table' then
+						local mod = vape.Modules[moduleName]
+						if mod then
+							-- toggle module
+							if moduleData.Enabled and not mod.Enabled then
+								pcall(function() mod:Toggle() end)
+							elseif not moduleData.Enabled and mod.Enabled then
+								pcall(function() mod:Toggle() end)
+							end
+							-- apply options
+							if moduleData.Options then
+								for optionName, optionVal in pairs(moduleData.Options) do
+									if mod.Options[optionName] then
+										pcall(function()
+											if type(optionVal) == 'table' and optionVal.Value ~= nil then
+												mod.Options[optionName]:SetValue(optionVal.Value)
+											elseif type(optionVal) == 'boolean' then
+												if mod.Options[optionName].Enabled ~= optionVal then
+													mod.Options[optionName]:Toggle()
+												end
+											elseif type(optionVal) == 'string' then
+												mod.Options[optionName]:SetValue(optionVal)
+											elseif type(optionVal) == 'number' then
+												mod.Options[optionName]:SetValue(optionVal)
+											end
+										end)
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- save config periodically and on unload
+	local function saveConfig()
+		local data = {}
+		for name, mod in pairs(vape.Modules) do
+			if mod.Enabled or (mod.Options and next(mod.Options)) then
+				data[name] = {Enabled = mod.Enabled, Options = {}}
+				if mod.Options then
+					for optName, opt in pairs(mod.Options) do
+						pcall(function()
+							if opt.Value ~= nil then
+								data[name].Options[optName] = {Value = opt.Value}
+							elseif opt.Enabled ~= nil then
+								data[name].Options[optName] = opt.Enabled
+							end
+						end)
+					end
+				end
+			end
+		end
+		pcall(function()
+			writefile(configPath, httpService:JSONEncode(data))
+		end)
+	end
+
+	-- load on startup
+	task.spawn(loadConfig)
+
+	-- autosave every 30 seconds
+	task.spawn(function()
+		while task.wait(30) do
+			if vape.Loaded then
+				pcall(saveConfig)
+			end
+		end
+	end)
+
+	-- save on unload
+	vape:Clean(function()
+		pcall(saveConfig)
+	end)
+
+	-- save on teleport
+	pcall(function()
+		game:GetService('Players').LocalPlayer.OnTeleport:Connect(function()
+			pcall(saveConfig)
+		end)
+	end)
+
+	-- save on character death/respawn
+	pcall(function()
+		lplr.CharacterAdded:Connect(function()
+			task.wait(2)
+			if vape.Loaded then
+				pcall(saveConfig)
+			end
+		end)
+	end)
+end
+
 local isAttacking = false
 
 -- shared state from main file
@@ -270,8 +387,7 @@ run(function()
 	local BedToggle
 	local GeneratorToggle
 	local SelfBreak
-	local TPDelay
-	local origCF
+	local InfiniteRange
 
 	local function getBlockAt(pos)
 		return blocks[pos // 3]
@@ -297,19 +413,9 @@ run(function()
 			if not SelfBreak.Enabled and v:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
 
 			if Mode.Value == 'Teleport' then
-				if entitylib.isAlive then
-					local root = entitylib.character.RootPart
-					origCF = root.CFrame
-					-- teleport on top of the block
-					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
-					task.wait(0.05)
-					breakBlockRemote(v)
-					task.wait(BreakSpeed.Value)
-					-- teleport back
-					if origCF then
-						root.CFrame = origCF
-					end
-				end
+				-- silent: fire remote from current position, server sees legit position
+				breakBlockRemote(v)
+				task.wait(BreakSpeed.Value)
 			else
 				if (blockPos - localPosition).Magnitude > Range.Value then continue end
 				breakBlockRemote(v)
@@ -327,17 +433,8 @@ run(function()
 			local blockPos = v.Position
 
 			if Mode.Value == 'Teleport' then
-				if entitylib.isAlive then
-					local root = entitylib.character.RootPart
-					origCF = root.CFrame
-					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
-					task.wait(0.05)
-					mineBlockRemote(v)
-					task.wait(BreakSpeed.Value)
-					if origCF then
-						root.CFrame = origCF
-					end
-				end
+				mineBlockRemote(v)
+				task.wait(BreakSpeed.Value)
 			else
 				if (blockPos - localPosition).Magnitude > Range.Value then continue end
 				mineBlockRemote(v)
@@ -352,12 +449,11 @@ run(function()
 		Name = 'Breaker',
 		Function = function(callback)
 			if callback then
-				origCF = nil
 				local beds = collectionService:GetTagged('BedWarsX_BedSpawn')
 				local generators = collectionService:GetTagged('BedWarsX_Resource')
 
 				repeat
-					task.wait(Mode.Value == 'Teleport' and TPDelay.Value or 0.1)
+					task.wait(0.1)
 					if not Breaker.Enabled then break end
 					if entitylib.isAlive then
 						local localPosition = entitylib.character.RootPart.Position
@@ -369,17 +465,15 @@ run(function()
 						end
 					end
 				until not Breaker.Enabled
-			else
-				origCF = nil
 			end
 		end,
-		Tooltip = 'Breaks beds and resource generators\nTeleport mode: TP to target, break, TP back'
+		Tooltip = 'Breaks beds and generators\nSilent: fires remote from your position'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
-		List = {'Normal', 'Teleport'},
-		Default = 'Normal',
-		Tooltip = 'Normal: break within range\nTeleport: TP to target instantly'
+		List = {'Silent', 'Normal'},
+		Default = 'Silent',
+		Tooltip = 'Silent: fire break remote from your position\nNormal: break within range'
 	})
 	Range = Breaker:CreateSlider({
 		Name = 'Break range',
@@ -396,15 +490,6 @@ run(function()
 		Default = 0.05,
 		Decimal = 100,
 		Suffix = 'sec'
-	})
-	TPDelay = Breaker:CreateSlider({
-		Name = 'TP delay',
-		Min = 0,
-		Max = 0.5,
-		Default = 0.1,
-		Decimal = 100,
-		Suffix = 'sec',
-		Tooltip = 'Delay between teleports in TP mode'
 	})
 	BedToggle = Breaker:CreateToggle({
 		Name = 'Break beds',
