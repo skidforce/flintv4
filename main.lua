@@ -388,9 +388,8 @@ if not shared.VapeIndependent then
 		gameScriptFinished = false
 
 		local started = os.clock()
-		task.spawn(function()
+		local thread = task.spawn(function()
 			local ok, err = pcall(fn, table.unpack(gameArgs, 1, gameArgs.n))
-			gameScriptFinished = true
 			-- Only for a game script slow enough that the split-load path actually engaged; a normal
 			-- game script never trips it.
 			local elapsed = os.clock() - started
@@ -399,6 +398,18 @@ if not shared.VapeIndependent then
 			end
 			if not ok then
 				warn('[flintv4] '..chunkname..' errored: '..tostring(err))
+			end
+		end)
+		-- gameScriptFinished is set INSIDE the coroutine above. If the coroutine is
+		-- killed mid-yield (e.g. by a teleport destroying the running thread), the
+		-- flag never flips and waitForModules hangs for the full 120s timeout.
+		-- Safety net: poll until the thread is dead, then force the flag. A fast
+		-- game script sets it before we even get here, so the extra check costs nothing.
+		task.spawn(function()
+			repeat task.wait(1) until gameScriptFinished or coroutine.status(thread) == 'dead'
+			if not gameScriptFinished then
+				warn('[flintv4] '..chunkname..' coroutine died before setting gameScriptFinished -- forcing completion')
+				gameScriptFinished = true
 			end
 		end)
 	end
