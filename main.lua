@@ -25,6 +25,13 @@ end
 local cloneref = cloneref or function(obj)
 	return obj
 end
+local listfiles = listfiles or function(folder)
+	return {}
+end
+local delfile = delfile or function(file)
+	pcall(function() writefile(file, '') end)
+end
+local isfolder = isfolder or function() return false end
 local playersService = cloneref(game:GetService('Players'))
 
 -- Version check: compare local version with remote, delete stale cache files if updated
@@ -44,18 +51,35 @@ local function checkForUpdates()
 
 	if remoteVersion ~= '' and remoteVersion ~= localVersion then
 		warn('[flintv4] Update detected ('..(localVersion ~= '' and localVersion or 'none')..' -> '..remoteVersion..')')
-		-- Delete cached game scripts that still have the watermark (unmodified downloads).
-		-- Files edited locally won't have the watermark and are preserved.
-		for _, placeId in {'6872274481', '6872265039', '8560631822', '8444591321'} do
-			local path = 'flintv4/games/'..placeId..'.lua'
-			if isfile(path) then
-				local ok, content = pcall(readfile, path)
-				if ok and type(content) == 'string' and content:sub(1, 60):find('watermark') then
-					pcall(delfile, path)
-					warn('[flintv4] Deleted unmodified cached: '..placeId..'.lua')
+		-- On version bump, clear ALL cached files that have the watermark (unmodified downloads).
+		-- The loader's updateCachedFiles will re-download them from the latest commit.
+		local httpService = cloneref(game:GetService('HttpService'))
+		local manifest = {}
+		pcall(function()
+			if isfile('flintv4/filecheck.json') then
+				manifest = httpService:JSONDecode(readfile('flintv4/filecheck.json'))
+			end
+		end)
+
+		local function checkFolder(folder)
+			for _, path in listfiles(folder) do
+				if isfolder(path) then
+					checkFolder(path)
+				elseif path:sub(-4) == '.lua' then
+					local ok, content = pcall(readfile, path)
+					if ok and type(content) == 'string' and content:sub(1, 60):find('watermark') then
+						pcall(delfile, path)
+						-- remove from manifest so loader re-downloads it
+						local rel = path:gsub('\\', '/'):gsub('^flintv4/', '')
+						manifest[rel] = nil
+						warn('[flintv4] Deleted stale cached: '..path)
+					end
 				end
 			end
 		end
+
+		pcall(checkFolder, 'flintv4')
+		pcall(writefile, 'flintv4/filecheck.json', httpService:JSONEncode(manifest))
 		pcall(writefile, 'flintv4/version.txt', remoteVersion)
 		warn('[flintv4] Version updated to '..remoteVersion)
 	end

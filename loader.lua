@@ -101,7 +101,7 @@ local function updateCachedFiles(onProgress)
 
 	local remote = {}
 	for _, v in tree.tree do
-		if v.type == 'blob' and v.path:sub(-4) == '.lua' then
+		if v.type == 'blob' then
 			remote[v.path] = v.sha
 		end
 	end
@@ -146,8 +146,17 @@ local function updateCachedFiles(onProgress)
 					local suc, res = pcall(function()
 						return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/'..headSha..'/'..select(1, path:gsub(' ', '%%20')), true)
 					end)
-					if suc and res and res ~= '' and res ~= '404: Not Found' and loadstring(res) ~= nil then
-						pcall(writefile, 'flintv4/'..path, Watermark..'\n'..res)
+					if suc and res and res ~= '' and res ~= '404: Not Found' then
+						-- compile check for .lua only, other files just write directly
+						if path:sub(-4) == '.lua' then
+							if loadstring(res) == nil then
+								if attempt < 4 then task.wait(attempt) end
+								continue
+							end
+							pcall(writefile, 'flintv4/'..path, Watermark..'\n'..res)
+						else
+							pcall(writefile, 'flintv4/'..path, res)
+						end
 						manifest[path] = remote[path]
 						changed = true
 						break
