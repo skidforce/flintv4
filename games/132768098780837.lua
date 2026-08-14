@@ -303,7 +303,6 @@ local Fly
 run(function()
 	local Value
 	local Keys
-	local Mode
 	local Platform = Instance.new('Part')
 	Platform.CanQuery = false
 	Platform.Anchored = true
@@ -311,111 +310,26 @@ run(function()
 	Platform.Transparency = 1
 	Platform.Parent = nil
 
-	local up, down = 0, 0
-	local lookFly = false
-
 	Fly = vape.Categories.Blatant:CreateModule({
 		Name = 'Fly',
 		Function = function(callback)
+			if Platform then
+				Platform.Parent = callback and gameCamera or nil
+			end
+
 			if callback then
 				if not AnticheatBypass.Enabled then
 					AnticheatBypass:Toggle()
 				end
 
-				local mode = Mode.Value
+				Fly:Clean(runService.PreSimulation:Connect(function(dt)
+					if entitylib.isAlive then
+						applySpeed(Value.Value, dt)
+						Platform.CFrame = down ~= 0 and CFrame.identity or entitylib.character.RootPart.CFrame + Vector3.new(0, -(entitylib.character.HipHeight + 0.5), 0)
+					end
+				end))
 
-				if mode == 'Platform' then
-					Platform.Parent = gameCamera
-
-					Fly:Clean(runService.PreSimulation:Connect(function(dt)
-						if entitylib.isAlive then
-							applySpeed(Value.Value, dt)
-							Platform.CFrame = down ~= 0 and CFrame.identity or entitylib.character.RootPart.CFrame + Vector3.new(0, -(entitylib.character.HipHeight + 0.5), 0)
-						end
-					end))
-
-				elseif mode == 'Velocity' then
-					Fly:Clean(runService.Heartbeat:Connect(function(dt)
-						if entitylib.isAlive then
-							local root = entitylib.character.RootPart
-							local hum = entitylib.character.Humanoid
-							local moveDir = hum.MoveDirection
-							local velo = root.AssemblyLinearVelocity
-
-							local horizontal = moveDir * Value.Value
-							local vertical = (up - down) * Value.Value * 0.8
-
-							root.AssemblyLinearVelocity = Vector3.new(horizontal.X, vertical, horizontal.Z)
-							root.AssemblyLinearVelocity = Vector3.new(velo.X, vertical, velo.Z)
-						end
-					end))
-
-				elseif mode == 'CFrame' then
-					Fly:Clean(runService.PreSimulation:Connect(function(dt)
-						if entitylib.isAlive then
-							local root = entitylib.character.RootPart
-							local hum = entitylib.character.Humanoid
-							local moveDir = hum.MoveDirection
-							local camCF = gameCamera.CFrame
-
-							local move = Vector3.zero
-							if moveDir.Magnitude > 0 then
-								move = (camCF * CFrame.new(moveDir)).Position - camCF.Position
-								move = move.Unit * Value.Value * dt
-							end
-
-							local vertical = (up - down) * Value.Value * dt
-
-							root.CFrame = root.CFrame + move + Vector3.new(0, vertical, 0)
-							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-						end
-					end))
-
-				elseif mode == 'Look' then
-					lookFly = true
-					Fly:Clean(runService.PreSimulation:Connect(function(dt)
-						if entitylib.isAlive then
-							local root = entitylib.character.RootPart
-							local camCF = gameCamera.CFrame
-							local move = camCF.LookVector * Value.Value * dt
-
-							if not inputService:IsKeyDown(Enum.KeyCode.W) then
-								move = Vector3.zero
-							end
-
-							local vertical = (up - down) * Value.Value * dt
-
-							root.CFrame = root.CFrame + move + Vector3.new(0, vertical, 0)
-							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-						end
-					end))
-
-				elseif mode == 'Hover' then
-					local hoverY = nil
-					Fly:Clean(runService.PreSimulation:Connect(function(dt)
-						if entitylib.isAlive then
-							local root = entitylib.character.RootPart
-							local hum = entitylib.character.Humanoid
-							local moveDir = hum.MoveDirection
-
-							if not hoverY then
-								hoverY = root.Position.Y
-							end
-
-							hoverY = hoverY + (up - down) * Value.Value * dt * 0.3
-
-							if moveDir.Magnitude > 0 then
-								local horiz = moveDir * Value.Value * dt
-								root.CFrame = root.CFrame + horiz
-							end
-
-							root.CFrame = CFrame.new(root.CFrame.Position.X, hoverY, root.CFrame.Position.Z) * (root.CFrame - root.CFrame.Position)
-							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-						end
-					end))
-				end
-
-				-- keybinds for up/down
+				up, down = 0, 0
 				for _, v in {'InputBegan', 'InputEnded'} do
 					Fly:Clean(inputService[v]:Connect(function(input)
 						if not inputService:GetFocusedTextBox() then
@@ -436,6 +350,29 @@ run(function()
 							up = jumpButton.ImageRectOffset.X == 146 and 1 or 0
 						end))
 					end)
+				end
+			end
+		end,
+		ExtraText = function()
+			return 'BlockWars'
+		end,
+		Tooltip = 'Makes you go zoom.'
+	})
+	Keys = Fly:CreateDropdown({
+		Name = 'Keys',
+		List = {'Space/LeftControl', 'Space/LeftShift', 'E/Q', 'Space/Q', 'ButtonA/ButtonL2'},
+		Tooltip = 'The key combination for going up & down'
+	})
+	Value = Fly:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 300,
+		Default = 100,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+end)
 				end
 			else
 				Platform.Parent = nil
@@ -472,219 +409,285 @@ end)
 
 run(function()
 	local Killaura
-	local AttackRange
+	local Targets
 	local SwingRange
-	local CPSMin
-	local CPSMax
-	local Angle
-	local SortMode
-	local FaceTarget
-	local SilentRotation
-	local SmoothRotation
-	local TargetBoxes = {}
-	local TargetParticles = {}
-	local lastAttack = 0
-	local lastTargets = {}
-	local AttackDelay = {}
+	local AttackRange
+	local AngleSlider
+	local Max
+	local Mouse
+	local BoxSwingColor
+	local BoxAttackColor
+	local ParticleTexture
+	local ParticleColor1
+	local ParticleColor2
+	local ParticleSize
+	local Face
+	local Particles, Boxes, AttackDelay = {}, {}, {}
 
-	local function sortTargets(entities)
-		local sorted = {}
-		for _, ent in entities do
-			if ent and ent.Character and ent.RootPart and ent ~= lplr then
-				local teamId = ent.Character:GetAttribute('TeamId')
-				if teamId and lplr.Team and teamId ~= lplr.Team.Name then
-					local dist = (ent.RootPart.Position - entitylib.character.RootPart.Position).Magnitude
-					table.insert(sorted, {Entity = ent, Distance = dist})
-				end
+	local function getSword()
+		local inv = getInventory()
+		for _, tool in inv do
+			if tool:GetAttribute('WeaponType') then
+				return tool
 			end
 		end
-		if SortMode.Value == 'Distance' then
-			table.sort(sorted, function(a, b) return a.Distance < b.Distance end)
-		elseif SortMode.Value == 'Health' then
-			table.sort(sorted, function(a, b)
-				local hpA = a.Entity.Humanoid and a.Entity.Humanoid.Health or 0
-				local hpB = b.Entity.Humanoid and b.Entity.Humanoid.Health or 0
-				return hpA < hpB
-			end)
+	end
+
+	local function getAttackData()
+		if Mouse.Enabled then
+			if not inputService:IsMouseButtonPressed(0) then return false end
 		end
-		return sorted
+
+		local tool = getSword()
+		return tool or nil, tool
 	end
 
-	local function createTargetBox()
-		local box = Instance.new('BoxHandleAdornment')
-		box.Adornee = nil
-		box.AlwaysOnTop = true
-		box.ZIndex = 10
-		box.Size = Vector3.new(3, 5, 3)
-		box.Color3 = Color3.fromRGB(255, 80, 80)
-		box.Transparency = 0.5
-		box.Parent = gameCamera
-		return box
-	end
-
-	local function createTargetParticle()
-		local part = Instance.new('Part')
-		part.Size = Vector3.new(0.1, 0.1, 0.1)
-		part.Anchored = true
-		part.CanCollide = false
-		part.Transparency = 1
-		part.Parent = gameCamera
-		local emitter = Instance.new('ParticleEmitter')
-		emitter.Color = ColorSequence.new(Color3.fromRGB(255, 80, 80))
-		emitter.Size = NumberSequence.new(0.5)
-		emitter.Lifetime = NumberRange.new(0.3, 0.5)
-		emitter.Rate = 50
-		emitter.Speed = NumberRange.new(2, 4)
-		emitter.Parent = part
-		emitter.Enabled = false
-		return part, emitter
-	end
-
-	for i = 1, 20 do
-		TargetBoxes[i] = createTargetBox()
-		TargetParticles[i] = createTargetParticle()
-	end
-
-	Killaura = vape.Categories.Combat:CreateModule({
+	Killaura = vape.Categories.Blatant:CreateModule({
 		Name = 'Killaura',
 		Function = function(callback)
 			if callback then
 				repeat
-					if entitylib.isAlive then
-						local root = entitylib.character.RootPart
-						local rootPos = root.Position
-						local cameraCF = gameCamera.CFrame
-						local entities = entitylib.AllPosition()
-						local sorted = sortTargets(entities)
-						local attacked = 0
-						local targets = {}
+					isAttacking = false
+					local tool = getAttackData()
+					local attacked = {}
 
-						for i, data in sorted do
-							if attacked >= 10 then break end
-							local ent = data.Entity
-							local entRoot = ent.RootPart
-							if not entRoot then continue end
+					if tool then
+						local plrs = entitylib.AllPosition({
+							Range = AttackRange.Value,
+							Wallcheck = Targets.Walls.Enabled or nil,
+							Origin = bypassRoot and bypassRoot.Position or nil,
+							Part = 'RootPart',
+							Players = Targets.Players.Enabled,
+							NPCs = Targets.NPCs.Enabled,
+							Limit = Max.Value
+						})
 
-							local angle = math.deg(math.acos(math.clamp(cameraCF.LookVector:Dot((entRoot.Position - rootPos).Unit), -1, 1)))
-							if angle > Angle.Value then continue end
+						if #plrs > 0 then
+							isAttacking = true
+							local selfpos = entitylib.character.RootPart.Position
+							local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
 
-							if BlockTimes[ent.Character] and (os.clock() - BlockTimes[ent.Character]) < 0.3 then
-								continue
+							if tool.Parent ~= lplr.Character then
+								entitylib.character.Humanoid:EquipTool(tool)
 							end
 
-							if (os.clock() - (AttackDelay[ent.Character] or 0)) < 0.03 then
-								continue
-							end
+							for _, v in plrs do
+								local delta = (v.RootPart.Position - selfpos)
+								local angle = math.acos(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit))
+								if angle > (math.rad(AngleSlider.Value) / 2) then continue end
 
-							local dist = data.Distance
-							if dist > AttackRange.Value then continue end
+								table.insert(attacked, {
+									Entity = v,
+									Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
+								})
+								targetinfo.Targets[v] = tick() + 1
 
-							attacked += 1
-							table.insert(targets, ent)
-							lastTargets[ent] = tick()
-
-							if FaceTarget.Enabled then
-								local lookDir = (entRoot.Position - rootPos) * Vector3.new(1, 0, 1)
-								if lookDir.Magnitude > 0 then
-									root.CFrame = CFrame.lookAt(rootPos, rootPos + lookDir.Unit)
+								if (os.clock() - (BlockTimes[v.Character] or 0)) < 0.3 then
+									continue
 								end
-							end
 
-							if TargetBoxes[attacked] then
-								TargetBoxes[attacked].Adornee = entRoot
-							end
-							if TargetParticles[attacked] then
-								TargetParticles[attacked].Position = entRoot.Position
-								TargetParticles[attacked].Parent = gameCamera
-							end
-						end
+								if (os.clock() - (AttackDelay[v.Character] or 0) < 0.03) then
+									continue
+								end
 
-						local now = tick()
-						local cps = math.random(CPSMin.Value, CPSMax.Value)
-						local delay = 1 / math.max(cps, 1)
-						if attacked > 0 and (now - lastAttack) >= delay then
-							for _, ent in targets do
-								pcall(function()
-									combatFeint:FireServer()
-									combatAttack:FireServer(
-										ent.Character and ent.Character:GetAttribute('EquippedWeaponType') or 'Sword',
-										ent.Character
-									)
-								end)
-								AttackDelay[ent.Character] = now
+								replicatedStorage.GameEvents.CombatRemotes.Combat_FeintSwing:FireServer()
+								replicatedStorage.GameEvents.CombatRemotes.Combat_RequestAttack:FireServer(tool:GetAttribute('WeaponType'), v.Character)
+								AttackDelay[v.Character] = os.clock()
 							end
-							lastAttack = now
-						end
-
-						for i = attacked + 1, 20 do
-							if TargetBoxes[i] then TargetBoxes[i].Adornee = nil end
-							if TargetParticles[i] then TargetParticles[i].Parent = nil end
 						end
 					end
-					task.wait()
+
+					for i, v in Boxes do
+						v.Adornee = attacked[i] and attacked[i].Entity.RootPart or nil
+						if v.Adornee then
+							v.Color3 = Color3.fromHSV(attacked[i].Check.Hue, attacked[i].Check.Sat, attacked[i].Check.Value)
+							v.Transparency = 1 - attacked[i].Check.Opacity
+						end
+					end
+
+					for i, v in Particles do
+						v.Position = attacked[i] and attacked[i].Entity.RootPart.Position or Vector3.new(9e9, 9e9, 9e9)
+						v.Parent = attacked[i] and gameCamera or nil
+					end
+
+					if Face.Enabled and attacked[1] then
+						local vec = attacked[1].Entity.RootPart.Position * Vector3.new(1, 0, 1)
+						entitylib.character.RootPart.CFrame = CFrame.lookAt(entitylib.character.RootPart.Position, Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z))
+					end
+
+					task.wait(0.016)
 				until not Killaura.Enabled
 			else
-				for i = 1, 20 do
-					if TargetBoxes[i] then TargetBoxes[i].Adornee = nil end
-					if TargetParticles[i] then TargetParticles[i].Parent = nil end
+				isAttacking = false
+
+				for _, v in Boxes do
+					v.Adornee = nil
 				end
-				lastTargets = {}
+
+				for _, v in Particles do
+					v.Parent = nil
+				end
 			end
 		end,
-		Tooltip = 'Auto attacks nearby enemies'
+		Tooltip = 'Attack players around you\nwithout aiming at them.'
+	})
+	Targets = Killaura:CreateTargets({
+		Players = true,
+		NPCs = true
 	})
 	AttackRange = Killaura:CreateSlider({
 		Name = 'Attack range',
 		Min = 1,
-		Max = 20,
-		Default = 14,
-		Suffix = 'studs'
+		Max = 13,
+		Default = 13,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
 	})
-	SwingRange = Killaura:CreateSlider({
-		Name = 'Swing range',
+	AngleSlider = Killaura:CreateSlider({
+		Name = 'Max angle',
 		Min = 1,
-		Max = 20,
-		Default = 14,
-		Suffix = 'studs'
+		Max = 360,
+		Default = 90
 	})
-	CPSMin = Killaura:CreateSlider({
-		Name = 'CPS min',
+	Max = Killaura:CreateSlider({
+		Name = 'Max targets',
 		Min = 1,
-		Max = 20,
-		Default = 8
+		Max = 10,
+		Default = 10
 	})
-	CPSMax = Killaura:CreateSlider({
-		Name = 'CPS max',
-		Min = 1,
-		Max = 20,
-		Default = 12
+	Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
+	Killaura:CreateToggle({
+		Name = 'Show target',
+		Function = function(callback)
+			BoxSwingColor.Object.Visible = callback
+			BoxAttackColor.Object.Visible = callback
+			if callback then
+				for i = 1, 10 do
+					local box = Instance.new('BoxHandleAdornment')
+					box.Adornee = nil
+					box.AlwaysOnTop = true
+					box.Size = Vector3.new(3, 5, 3)
+					box.CFrame = CFrame.new(0, -0.5, 0)
+					box.ZIndex = 0
+					box.Parent = vape.gui
+					Boxes[i] = box
+				end
+			else
+				for _, v in Boxes do
+					v:Destroy()
+				end
+				table.clear(Boxes)
+			end
+		end
 	})
-	Angle = Killaura:CreateSlider({
-		Name = 'Angle',
-		Min = 30,
-		Max = 180,
-		Default = 90,
-		Suffix = 'deg'
+	BoxSwingColor = Killaura:CreateColorSlider({
+		Name = 'Target Color',
+		Darker = true,
+		DefaultHue = 0.6,
+		DefaultOpacity = 0.5,
+		Visible = false
 	})
-	SortMode = Killaura:CreateDropdown({
-		Name = 'Sort mode',
-		List = {'Distance', 'Health'},
-		Default = 'Distance'
+	BoxAttackColor = Killaura:CreateColorSlider({
+		Name = 'Attack Color',
+		Darker = true,
+		DefaultOpacity = 0.5,
+		Visible = false
 	})
-	FaceTarget = Killaura:CreateToggle({
-		Name = 'Face target',
-		Default = true
+	Killaura:CreateToggle({
+		Name = 'Target particles',
+		Function = function(callback)
+			ParticleTexture.Object.Visible = callback
+			ParticleColor1.Object.Visible = callback
+			ParticleColor2.Object.Visible = callback
+			ParticleSize.Object.Visible = callback
+			if callback then
+				for i = 1, 10 do
+					local part = Instance.new('Part')
+					part.Size = Vector3.new(2, 4, 2)
+					part.Anchored = true
+					part.CanCollide = false
+					part.Transparency = 1
+					part.CanQuery = false
+					part.Parent = Killaura.Enabled and gameCamera or nil
+					local particles = Instance.new('ParticleEmitter')
+					particles.Brightness = 1.5
+					particles.Size = NumberSequence.new(ParticleSize.Value)
+					particles.Shape = Enum.ParticleEmitterShape.Sphere
+					particles.Texture = ParticleTexture.Value
+					particles.Transparency = NumberSequence.new(0)
+					particles.Lifetime = NumberRange.new(0.4)
+					particles.Speed = NumberRange.new(16)
+					particles.Rate = 128
+					particles.Drag = 16
+					particles.ShapePartial = 1
+					particles.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
+						ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
+					})
+					particles.Parent = part
+					Particles[i] = part
+				end
+			else
+				for _, v in Particles do
+					v:Destroy()
+				end
+				table.clear(Particles)
+			end
+		end
 	})
-	SilentRotation = Killaura:CreateToggle({
-		Name = 'Silent rotation',
-		Default = false,
-		Tooltip = 'Rotate without sending to server'
+	ParticleTexture = Killaura:CreateTextBox({
+		Name = 'Texture',
+		Default = 'rbxassetid://14736249347',
+		Function = function()
+			for _, v in Particles do
+				v.ParticleEmitter.Texture = ParticleTexture.Value
+			end
+		end,
+		Darker = true,
+		Visible = false
 	})
-	SmoothRotation = Killaura:CreateToggle({
-		Name = 'Smooth rotation',
-		Default = false,
-		Tooltip = 'Lerp rotation smoothly'
+	ParticleColor1 = Killaura:CreateColorSlider({
+		Name = 'Color Begin',
+		Function = function(hue, sat, val)
+			for _, v in Particles do
+				v.ParticleEmitter.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, sat, val)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
+				})
+			end
+		end,
+		Darker = true,
+		Visible = false
 	})
+	ParticleColor2 = Killaura:CreateColorSlider({
+		Name = 'Color End',
+		Function = function(hue, sat, val)
+			for _, v in Particles do
+				v.ParticleEmitter.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, sat, val))
+				})
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	ParticleSize = Killaura:CreateSlider({
+		Name = 'Size',
+		Min = 0,
+		Max = 1,
+		Default = 0.2,
+		Decimal = 100,
+		Function = function(val)
+			for _, v in Particles do
+				v.ParticleEmitter.Size = NumberSequence.new(val)
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	Face = Killaura:CreateToggle({Name = 'Face target'})
 end)
 
 run(function()
@@ -1016,74 +1019,62 @@ run(function()
 	local SelfBreak
 	local origCF
 
-	local function breakBlockRemote(v)
-		pcall(function()
-			bw.RemoteIndex.Block_AttemptHit:FireServer(gameCamera.CFrame.Position, v.Position, v)
-		end)
-	end
-
-	local function mineBlockRemote(v)
-		pcall(function()
-			bw.RemoteIndex.Mine_AttemptHit:FireServer(v)
-		end)
-	end
-
-	local function attemptBreak(tab, localPosition)
-		if not tab then return false end
-		for _, v in tab do
-			if not v or not v.Parent then continue end
-			local blockPos = v.Position
-			if not SelfBreak.Enabled and v:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
-
-			if Mode.Value == 'Silent' then
-				breakBlockRemote(v)
-				task.wait(BreakSpeed.Value)
-			elseif Mode.Value == 'Teleport' then
-				if entitylib.isAlive then
-					local root = entitylib.character.RootPart
-					origCF = root.CFrame
-					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
-					task.wait(0.05)
-					breakBlockRemote(v)
-					task.wait(BreakSpeed.Value)
-					if origCF then root.CFrame = origCF end
-				end
-			else
-				if (blockPos - localPosition).Magnitude > Range.Value then continue end
-				breakBlockRemote(v)
-				task.wait(BreakSpeed.Value)
+	local function getPick()
+		local inv = getInventory()
+		for _, tool in inv do
+			if tool:GetAttribute('Tier') then
+				return tool
 			end
-			return true
 		end
-		return false
 	end
 
-	local function attemptBreakGen(tab, localPosition)
-		if not tab then return false end
+	local function attemptBreak(tab, localPosition, tool)
+		if not tab then return end
 		for _, v in tab do
-			if not v or not v.Parent then continue end
-			local blockPos = v.Position
-
-			if Mode.Value == 'Silent' then
-				mineBlockRemote(v)
-				task.wait(BreakSpeed.Value)
-			elseif Mode.Value == 'Teleport' then
-				if entitylib.isAlive then
-					local root = entitylib.character.RootPart
-					origCF = root.CFrame
-					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
-					task.wait(0.05)
-					mineBlockRemote(v)
-					task.wait(BreakSpeed.Value)
-					if origCF then root.CFrame = origCF end
+			if (v.Position - localPosition).Magnitude < Range.Value and v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
+				if tool.Parent ~= lplr.Character then
+					entitylib.character.Humanoid:EquipTool(tool)
 				end
-			else
-				if (blockPos - localPosition).Magnitude > Range.Value then continue end
-				mineBlockRemote(v)
-				task.wait(BreakSpeed.Value)
+
+				if v:HasTag('BedWarsX_BedSpawn') then
+					local notCovered = false
+					for _, normal in Enum.NormalId:GetEnumItems() do
+						if normal ~= Enum.NormalId.Bottom then
+							if not blocks[v.Position // 3 + Vector3.fromNormalId(normal)] then
+								notCovered = true
+								break
+							end
+						end
+					end
+
+					if notCovered then
+						bw.RemoteIndex.Block_AttemptHit:FireServer({
+							camPos = localPosition,
+							hitPos = v:GetClosestPointOnSurface(localPosition),
+							blockInstance = v
+						})
+					else
+						local aboveBlock = blocks[v.Position // 3 + Vector3.new(0, 1, 0)]
+
+						if aboveBlock then
+							bw.RemoteIndex.Block_AttemptHit:FireServer({
+								camPos = localPosition,
+								hitPos = aboveBlock:GetClosestPointOnSurface(localPosition),
+								blockInstance = aboveBlock
+							})
+						end
+					end
+
+					task.wait(0.15)
+				else
+					bw.RemoteIndex.Mine_AttemptHit:FireServer(v)
+				end
+
+				task.wait(0.05)
+				return true
 			end
-			return true
 		end
+
 		return false
 	end
 
@@ -1095,15 +1086,19 @@ run(function()
 				local generators = collection('BedWarsX_Resource', Breaker)
 
 				repeat
-					task.wait(0.1)
+					task.wait(1 / 60)
 					if not Breaker.Enabled then break end
-					if entitylib.isAlive then
-						local localPosition = entitylib.character.RootPart.Position
+
+					local tool = getPick()
+					if entitylib.isAlive and tool and not isAttacking then
+						-- always use bypassRoot position so server thinks you're at the core
+						local localPosition = bypassRoot and bypassRoot.Position or entitylib.character.RootPart.Position
+
 						if BedToggle.Enabled then
-							if attemptBreak(beds, localPosition) then continue end
+							if attemptBreak(beds, localPosition, tool) then continue end
 						end
 						if GeneratorToggle.Enabled then
-							if attemptBreakGen(generators, localPosition) then continue end
+							if attemptBreak(generators, localPosition, tool) then continue end
 						end
 					end
 				until not Breaker.Enabled
@@ -1111,29 +1106,30 @@ run(function()
 				origCF = nil
 			end
 		end,
-		Tooltip = 'Breaks beds and generators\nSilent: fires remote from your position'
+		Tooltip = 'Break blocks around you automatically'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
-		List = {'Silent', 'Teleport', 'Normal'},
-		Default = 'Silent',
-		Tooltip = 'Silent: fire remote from your position\nTeleport: TP to target, break, TP back\nNormal: break within range'
+		List = {'Auto', 'Silent', 'Normal'},
+		Default = 'Auto',
+		Tooltip = 'Auto: uses bypassRoot position\nSilent: fires from your position\nNormal: range check from your position'
 	})
 	Range = Breaker:CreateSlider({
 		Name = 'Break range',
 		Min = 1,
-		Max = 100,
-		Default = 18,
-		Suffix = 'studs',
-		Tooltip = 'Only used in Normal mode'
+		Max = 12,
+		Default = 12,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
 	})
 	BreakSpeed = Breaker:CreateSlider({
 		Name = 'Break speed',
 		Min = 0,
 		Max = 0.3,
-		Default = 0.05,
+		Default = 0.25,
 		Decimal = 100,
-		Suffix = 'sec'
+		Suffix = 'seconds'
 	})
 	BedToggle = Breaker:CreateToggle({
 		Name = 'Break beds',
