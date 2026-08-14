@@ -13,18 +13,14 @@ local isfile = isfile or function(file)
 	return suc and res ~= nil and res ~= ''
 end
 vape.Place = 6872274481
--- 8560631822 is the same BedWars game under a different PlaceId. The real
--- setup (shared.bedwars, services, vape libs) lives in 6872274481.lua, which
--- loads bedwars.lua itself once that's done -- loading bedwars.lua directly
--- from here skips that setup and shared.bedwars is nil when it runs.
+-- 8560631822 is the same BedWars game under a different PlaceId.
+-- All BedWars modules are built into 6872274481.lua (CatV6-based).
 local gamePath = 'flintv4/games/6872274481.lua'
 local cached = isfile(gamePath) and readfile(gamePath) or nil
 if cached and cached:gsub('%s', '') ~= '' then
 	loadstring(cached, '6872274481')()
 elseif not shared.FlintV4Developer then
-	-- Fetched from GitHub: only bedwars.lua lives off-repo (on GitLab), and the old host's
-	-- stale copy of this file was being downloaded twice (once to probe for existence, then
-	-- again to save it).
+	-- Fetched from GitHub on first run.
 	local content
 	for attempt = 1, 4 do
 		local suc, res = pcall(function()

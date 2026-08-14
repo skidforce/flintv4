@@ -47,18 +47,10 @@ end
 
 local function downloadFile(path, func)
 	if not hasContent(path) then
-		-- bedwars.lua is fetched from a separate path; everything else lives in the
-		-- GitHub repo.
 		local relPath = select(1, path:gsub('flintv4/', ''))
-		local isBedwars = relPath == 'games/bedwars.lua'
-		-- Retried a few times: raw file hosts intermittently fail, returning an empty body that
-		-- would otherwise get cached as a corrupt/empty file.
 		local content
 		for attempt = 1, 4 do
 			local suc, res = pcall(function()
-				if isBedwars then
-					return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua', true)
-				end
 				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..relPath, true)
 			end)
 			-- For .lua files, a compile check too: an outage can hand back the 503/error page
@@ -218,7 +210,7 @@ local function finishLoading()
 		autosave loop therefore sit behind the same wait.
 
 		A normal game script has already finished by the time we get here (task.spawn runs it
-		inline until it yields, and only bedwars.lua yields), so this whole block runs
+		inline until it yields, and only the BedWars game script yields), so this whole block runs
 		synchronously and behaves exactly as it always did.
 	]]
 	local function applyProfile()
@@ -375,9 +367,9 @@ if not shared.VapeIndependent then
 	-- file except BedWars -- has already set gameScriptFinished before we get past this line,
 	-- and finishLoading takes the single-pass path exactly as it always did.
 	--
-	-- BedWars is the exception. bedwars.lua takes ~30s, and none of its modules can exist until
-	-- it finishes -- that part is not fixable from here. What it must not do is hold up the GUI,
-	-- the universal modules and your config, none of which have anything to do with it.
+	-- BedWars is the exception. The CatV6 BedWars script takes ~30s and none of its modules can
+	-- exist until it finishes -- that part is not fixable from here. What it must not do is hold
+	-- up the GUI, the universal modules and your config, none of which have anything to do with it.
 	--
 	-- Varargs are packed because '...' is only valid directly in this chunk, never inside the
 	-- nested function the spawn needs.
