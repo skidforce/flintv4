@@ -382,6 +382,7 @@ run(function()
 	local AngleSlider
 	local Max
 	local Mouse
+	local Mode
 	local BoxSwingColor
 	local BoxAttackColor
 	local ParticleTexture
@@ -390,6 +391,7 @@ run(function()
 	local ParticleSize
 	local Face
 	local Particles, Boxes, AttackDelay = {}, {}, {}
+	local origCF
 
 	local function getSword()
 		local inv = getInventory()
@@ -413,14 +415,19 @@ run(function()
 		Name = 'Killaura',
 		Function = function(callback)
 			if callback then
+				if not AnticheatBypass.Enabled then
+					AnticheatBypass:Toggle()
+				end
+
 				repeat
 					isAttacking = false
 					local tool = getAttackData()
 					local attacked = {}
 
 					if tool then
+						local searchRange = Mode.Value == 'Teleport' and 10000 or AttackRange.Value
 						local plrs = entitylib.AllPosition({
-							Range = AttackRange.Value,
+							Range = searchRange,
 							Wallcheck = Targets.Walls.Enabled or nil,
 							Origin = bypassRoot and bypassRoot.Position or nil,
 							Part = 'RootPart',
@@ -443,6 +450,13 @@ run(function()
 								local angle = math.acos(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit))
 								if angle > (math.rad(AngleSlider.Value) / 2) then continue end
 
+								if Mode.Value == 'Teleport' then
+									-- Teleport to target, attack, teleport back
+									origCF = entitylib.character.RootPart.CFrame
+									entitylib.character.RootPart.CFrame = CFrame.new(v.RootPart.Position + Vector3.new(0, 3, 0))
+									task.wait(0.02)
+								end
+
 								table.insert(attacked, {
 									Entity = v,
 									Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
@@ -450,16 +464,27 @@ run(function()
 								targetinfo.Targets[v] = tick() + 1
 
 								if (os.clock() - (BlockTimes[v.Character] or 0)) < 0.3 then
+									if Mode.Value == 'Teleport' and origCF then
+										entitylib.character.RootPart.CFrame = origCF
+									end
 									continue
 								end
 
 								if (os.clock() - (AttackDelay[v.Character] or 0) < 0.03) then
+									if Mode.Value == 'Teleport' and origCF then
+										entitylib.character.RootPart.CFrame = origCF
+									end
 									continue
 								end
 
 								replicatedStorage.GameEvents.CombatRemotes.Combat_FeintSwing:FireServer()
 								replicatedStorage.GameEvents.CombatRemotes.Combat_RequestAttack:FireServer(tool:GetAttribute('WeaponType'), v.Character)
 								AttackDelay[v.Character] = os.clock()
+
+								if Mode.Value == 'Teleport' and origCF then
+									task.wait(0.02)
+									entitylib.character.RootPart.CFrame = origCF
+								end
 							end
 						end
 					end
@@ -496,7 +521,13 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Attack players around you\nwithout aiming at them.'
+		Tooltip = 'Attack players around you\nTeleport: TP to target, attack, TP back (infinite range)\nNormal: attack within range'
+	})
+	Mode = Killaura:CreateDropdown({
+		Name = 'Mode',
+		List = {'Teleport', 'Normal'},
+		Default = 'Teleport',
+		Tooltip = 'Teleport: TP to target, attack, TP back\nNormal: attack within range'
 	})
 	Targets = Killaura:CreateTargets({
 		Players = true,
