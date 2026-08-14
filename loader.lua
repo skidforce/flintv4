@@ -76,94 +76,6 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
-local function fetchProfilesListing(ref)
-	local reqSuc, res = pcall(function()
-		return game:HttpGet('https://api.github.com/repos/skidforce/flintv4/contents/profiles'..(ref and ('?ref='..ref) or ''), true)
-	end)
-	if not (reqSuc and res and res ~= '404: Not Found') then return nil end
-	local bodySuc, body = pcall(function()
-		return cloneref(game:GetService('HttpService')):JSONDecode(res)
-	end)
-	if not (bodySuc and body and typeof(body) == 'table') then return nil end
-	return body
-end
-
-local function mergeGuiState(path, incoming)
-	if not path:find('%.gui%.txt$') then return incoming end
-	local ok, merged = pcall(function()
-		local httpService = cloneref(game:GetService('HttpService'))
-		local new = httpService:JSONDecode(incoming)
-		if type(new) ~= 'table' then return incoming end
-		if isfile(path) then
-			local old = httpService:JSONDecode(readfile(path))
-			if type(old) == 'table' then
-				if old.Profiles ~= nil then new.Profiles = old.Profiles end
-				if old.Profile ~= nil then new.Profile = old.Profile end
-			end
-		end
-		return httpService:JSONEncode(new)
-	end)
-	return (ok and type(merged) == 'string') and merged or incoming
-end
-
-local function downloadProfilesListing(body, commit, onProgress)
-	local files = {}
-	for _, v in body do
-		if v.type == 'file' then
-			table.insert(files, v)
-		end
-	end
-	local completed, pending, total = 0, #files, #files
-	local done = Instance.new('BindableEvent')
-	for _, v in files do
-		local relPath = ({v.path:gsub(' ', '%%20')})[1]
-		task.spawn(function()
-			if commit then
-				pcall(function()
-					for attempt = 1, 4 do
-						local suc, res = pcall(function()
-							return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/'..commit..'/'..relPath, true)
-						end)
-						if suc and res and res ~= '' and res ~= '404: Not Found' then
-							writefile('flintv4/'..relPath, mergeGuiState('flintv4/'..relPath, res))
-							break
-						end
-						if attempt < 4 then
-							task.wait(attempt)
-						end
-					end
-				end)
-			else
-				pcall(downloadFile, 'flintv4/'..relPath)
-			end
-			completed += 1
-			pending -= 1
-			if onProgress then
-				onProgress(completed, total)
-			end
-			if pending <= 0 then
-				done:Fire()
-			end
-		end)
-	end
-	if pending > 0 then
-		done.Event:Wait()
-	end
-	done:Destroy()
-end
-
-local function fetchProfilesCommit()
-	local reqSuc, res = pcall(function()
-		return game:HttpGet('https://api.github.com/repos/skidforce/flintv4/commits?path=profiles&sha=main&per_page=1', true)
-	end)
-	if not (reqSuc and res and res ~= '404: Not Found') then return nil end
-	local bodySuc, body = pcall(function()
-		return cloneref(game:GetService('HttpService')):JSONDecode(res)
-	end)
-	if not (bodySuc and body and typeof(body) == 'table' and body[1] and body[1].sha) then return nil end
-	return body[1].sha
-end
-
 local function updateCachedFiles(onProgress)
 	local httpService = cloneref(game:GetService('HttpService'))
 
@@ -784,134 +696,10 @@ if not isReload and not isDeveloper then
 	if console:IsAborted() then deleteInstall() return end
 end
 console:SetProgress(0.46)
-
-local firstRunProfiles = false
-pcall(function()
-	firstRunProfiles = #listfiles('flintv4/profiles') < 3
-end)
-
-local declinedDownload = false
-pcall(function()
-	if isfile('flintv4/profiles/profilecheck.txt') then
-		declinedDownload = readfile('flintv4/profiles/profilecheck.txt') == 'false'
-	end
-end)
-
-local wantsDownload = true
-if firstRunProfiles and not declinedDownload then
-	console:SetProgress(0.47)
-	local ok, res = pcall(function()
-		return console:Ask('Would you like to download the latest config?', {
-			{text = 'Yes', key = true, tooltip = 'Downloads the Blatant and Legit configs from GitHub'},
-			{text = 'No', key = false, tooltip = 'Starts on default settings and stops asking on future runs'}
-		}, 60, true)
-	end)
-	if console:IsAborted() then deleteInstall() return end
-	wantsDownload = ok and res == true
-	if not wantsDownload then
-		pcall(function() writefile('flintv4/profiles/profilecheck.txt', 'false') end)
-	end
-end
-console:SetProgress(0.53)
-
-local downloadedConfigs = false
-if firstRunProfiles and not declinedDownload and wantsDownload then
-	console:SetLine('Downloading configs...')
-	pcall(function()
-		local body = fetchProfilesListing()
-		if body then
-			downloadProfilesListing(body, nil, function(completed, total)
-				console:SetLine('Downloading configs ('..completed..'/'..total..')...')
-				console:SetProgress(0.53 + 0.2 * (completed / math.max(total, 1)))
-			end)
-		end
-	end)
-	pcall(function()
-		downloadedConfigs = #listfiles('flintv4/profiles') >= 3
-	end)
-	if downloadedConfigs then
-		pcall(function()
-			local commit = fetchProfilesCommit()
-			if commit then
-				writefile('flintv4/profiles/profilecommit.txt', commit)
-			end
-		end)
-	end
-end
-if console:IsAborted() then deleteInstall() return end
-
-if not firstRunProfiles and not declinedDownload and not isReload then
-	local latestCommit, cachedCommit
-	pcall(function()
-		latestCommit = fetchProfilesCommit()
-		cachedCommit = isfile('flintv4/profiles/profilecommit.txt') and readfile('flintv4/profiles/profilecommit.txt'):gsub('%s', '') or nil
-	end)
-	if latestCommit and latestCommit ~= cachedCommit then
-		console:SetProgress(0.6)
-		local ok, wantsSync = pcall(function()
-			return console:Ask('Would you like to sync to the latest config?', {
-				{text = 'Yes', key = true, tooltip = 'Replaces the shipped configs with the newer ones on GitHub'},
-				{text = 'No', key = false, tooltip = 'Keeps the configs you have, asks again next session'}
-			}, 60, false)
-		end)
-		if console:IsAborted() then deleteInstall() return end
-		if ok and wantsSync == true then
-			console:SetLine('Syncing configs...')
-			local lastProfile
-			pcall(function()
-				local live = shared.vape and shared.vape.Profile
-				if type(live) == 'string' and live ~= '' then
-					lastProfile = live
-					return
-				end
-				local guipath = 'flintv4/profiles/'..game.GameId..'.gui.txt'
-				if not isfile(guipath) then return end
-				local guidata = cloneref(game:GetService('HttpService')):JSONDecode(readfile(guipath))
-				if type(guidata) == 'table' and type(guidata.Profile) == 'string' and guidata.Profile ~= '' then
-					lastProfile = guidata.Profile
-				end
-			end)
-			pcall(function()
-				if shared.vape then
-					pcall(function() shared.vape:Uninject() end)
-					shared.vape = nil
-				end
-				local body = fetchProfilesListing(latestCommit)
-				if body then
-					downloadProfilesListing(body, latestCommit, function(completed, total)
-						console:SetLine('Syncing configs ('..completed..'/'..total..')...')
-						console:SetProgress(0.6 + 0.13 * (completed / math.max(total, 1)))
-					end)
-					writefile('flintv4/profiles/profilecommit.txt', latestCommit)
-				end
-			end)
-			if console:IsAborted() then deleteInstall() return end
-			if lastProfile then
-				shared.VapeCustomProfile = lastProfile
-			end
-		end
-	end
-end
-console:SetProgress(0.73)
-
-if downloadedConfigs then
-	local ok, choice = pcall(function()
-		return console:Ask('Which config would you like to load by default?', {
-			{text = 'Blatant', key = 'blatant', tooltip = 'Makes Blatant your default config: everything on, obvious'},
-			{text = 'Legit', key = 'legit', tooltip = 'Makes Legit your default config: toned down to look normal'}
-		}, 120, nil)
-	end)
-	if console:IsAborted() then deleteInstall() return end
-	if ok and type(choice) == 'string' then
-		shared.VapeCustomProfile = choice
-	end
-end
-
-console:SetProgress(0.8)
 console:SetLine('Loading flintv4...')
 local injecting = true
 task.spawn(function()
-	local alpha = 0.8
+	local alpha = 0.5
 	while injecting and alpha < 0.93 do
 		task.wait(0.6)
 		if not injecting then break end
@@ -931,7 +719,6 @@ if console:IsAborted() then
 	if shared.vape then
 		pcall(function() shared.vape:Uninject() end)
 	end
-	shared.VapeCustomProfile = nil
 	deleteInstall()
 	return
 end
