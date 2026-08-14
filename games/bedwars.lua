@@ -1,4 +1,5 @@
-local bedwarsmodules = {}
+-- FlintV4 BedWars combat modules
+-- Loaded by6872274481.lua via loadstring — must grab everything from globals/shared.
 
 local run = function(func)
 	local ok, err = pcall(func)
@@ -6,6 +7,21 @@ local run = function(func)
 		warn('[flintv4] bedwars module failed: '..tostring(err))
 	end
 end
+
+local vape = shared.vape
+local entitylib = vape.Libraries.entity
+local targetinfo = vape.Libraries.targetinfo
+local bedwars = getgenv().bedwars or shared.bedwars
+local store = getgenv().store
+local cloneref = cloneref or function(o) return o end
+local inputService = cloneref(game:GetService('UserInputService'))
+local tweenService = cloneref(game:GetService('TweenService'))
+local collectionService = cloneref(game:GetService('CollectionService'))
+local gameCamera = workspace.CurrentCamera
+local lplr = game.Players.LocalPlayer
+local canSwing = getgenv().canSwing
+local collection = getgenv().collection
+local sortmethods = getgenv().sortmethods
 
 run(function()
 	local Killaura
