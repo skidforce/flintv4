@@ -1,5 +1,5 @@
 -- FlintV4 BedWars combat modules
--- Loaded by6872274481.lua via loadstring — must grab everything from globals/shared.
+-- Loaded by 6872274481.lua via loadstring — must grab everything from globals/shared.
 
 local run = function(func)
 	local ok, err = pcall(func)
@@ -22,6 +22,8 @@ local lplr = game.Players.LocalPlayer
 local canSwing = getgenv().canSwing
 local collection = getgenv().collection
 local sortmethods = getgenv().sortmethods
+local playersService = cloneref(game:GetService('Players'))
+local runService = cloneref(game:GetService('RunService'))
 
 run(function()
 	local Killaura
@@ -39,7 +41,13 @@ run(function()
 	local ParticleColor2
 	local ParticleSize
 	local Face
+	local Silent
+	local SortMode
+	local SmoothRotation
+	local MultiSwing
 	local Particles, Boxes, AttackDelay = {}, {}, tick()
+	local lastTargets = {}
+	local rotateAngle = 0
 
 	local function getAttackData()
 		if Mouse.Enabled then
@@ -48,10 +56,34 @@ run(function()
 		return store.hand.tool and store.hand.toolType == 'sword' and canSwing()
 	end
 
+	local function sortTargets(targets, method)
+		if method == 'Distance' then
+			table.sort(targets, function(a, b)
+				local aDelta = a.RootPart.Position - entitylib.character.RootPart.Position
+				local bDelta = b.RootPart.Position - entitylib.character.RootPart.Position
+				return aDelta.Magnitude < bDelta.Magnitude
+			end)
+		elseif method == 'Health' then
+			table.sort(targets, function(a, b)
+				return a.Humanoid.Health < b.Humanoid.Health
+			end)
+		elseif method == 'Angle' then
+			local selfpos = entitylib.character.RootPart.Position
+			local facing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+			table.sort(targets, function(a, b)
+				local aAngle = math.acos(facing:Dot(((a.RootPart.Position - selfpos) * Vector3.new(1, 0, 1)).Unit))
+				local bAngle = math.acos(facing:Dot(((b.RootPart.Position - selfpos) * Vector3.new(1, 0, 1)).Unit))
+				return aAngle < bAngle
+			end)
+		end
+		return targets
+	end
+
 	Killaura = vape.Categories.Combat:CreateModule({
 		Name = 'Killaura',
 		Function = function(callback)
 			if callback then
+				lastTargets = {}
 				repeat
 					local attacked = {}
 					if getAttackData() then
@@ -61,28 +93,59 @@ run(function()
 							Part = 'RootPart',
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Limit = Max.Value
+							Limit = Max.Value + 5
 						})
 
 						if #plrs > 0 then
 							local selfpos = entitylib.character.RootPart.Position
 							local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+							local filtered = {}
 
 							for _, v in plrs do
 								local delta = (v.RootPart.Position - selfpos)
-								local angle = math.acos(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit))
+								local angle = math.acos(math.clamp(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit), -1, 1))
 								if angle > (math.rad(AngleSlider.Value) / 2) then continue end
+								table.insert(filtered, v)
+							end
+
+							filtered = sortTargets(filtered, SortMode.Value)
+							for i = 1, math.min(#filtered, Max.Value) do
+								local v = filtered[i]
+								local delta = (v.RootPart.Position - selfpos)
 
 								table.insert(attacked, {
 									Entity = v,
 									Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
 								})
 								targetinfo.Targets[v] = tick() + 1
+							end
 
-								if delta.Magnitude <= AttackRange.Value and AttackDelay < tick() then
-									AttackDelay = tick() + (1 / CPS.GetRandomValue())
-									bedwars.SwordController:swingSwordAtMouse()
+							if #attacked > 0 then
+								local attackCount = Silent.Enabled and #attacked or 1
+								local swingCount = MultiSwing.Enabled and math.min(#attacked, 3) or 1
+
+								for swing = 1, swingCount do
+									if AttackDelay < tick() then
+										local cpsValue = CPS.GetRandomValue()
+										AttackDelay = tick() + (1 / cpsValue) + (math.random(-10, 10) / 1000)
+
+										if Silent.Enabled and attacked[swing] then
+											local target = attacked[swing].Entity
+											local targetPos = target.RootPart.Position
+											local lookDir = (targetPos - selfpos).Unit
+											local oldCF = entitylib.character.RootPart.CFrame
+											entitylib.character.RootPart.CFrame = CFrame.lookAt(selfpos, Vector3.new(targetPos.X, selfpos.Y, targetPos.Z))
+											bedwars.SwordController:swingSwordAtMouse()
+											entitylib.character.RootPart.CFrame = oldCF
+										else
+											bedwars.SwordController:swingSwordAtMouse()
+										end
+									end
 								end
+							end
+
+							for _, data in attacked do
+								lastTargets[data.Entity] = tick()
 							end
 						end
 					end
@@ -100,14 +163,26 @@ run(function()
 						v.Parent = attacked[i] and gameCamera or nil
 					end
 
-					if Face.Enabled and attacked[1] then
-						local vec = attacked[1].Entity.RootPart.Position * Vector3.new(1, 0, 1)
-						entitylib.character.RootPart.CFrame = CFrame.lookAt(entitylib.character.RootPart.Position, Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z))
+					if not Silent.Enabled and Face.Enabled and attacked[1] then
+						local targetPos = attacked[1].Entity.RootPart.Position
+						local currentCF = entitylib.character.RootPart.CFrame
+						local targetLook = CFrame.lookAt(currentCF.Position, Vector3.new(targetPos.X, currentCF.Position.Y + 0.01, targetPos.Z))
+
+						if SmoothRotation.Enabled then
+							rotateAngle = rotateAngle + (1 / 6)
+							local alpha = math.clamp(rotateAngle, 0, 1)
+							entitylib.character.RootPart.CFrame = currentCF:Lerp(targetLook, alpha)
+						else
+							entitylib.character.RootPart.CFrame = targetLook
+						end
+					elseif not Face.Enabled then
+						rotateAngle = 0
 					end
 
 					task.wait()
 				until not Killaura.Enabled
 			else
+				lastTargets = {}
 				for _, v in Boxes do
 					v.Adornee = nil
 				end
@@ -116,7 +191,7 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Attack players around you\nwithout aiming at them.'
+		Tooltip = 'Attack players around you\nwithout aiming at them.\nSilent mode rotates attack only.'
 	})
 	Targets = Killaura:CreateTargets({Players = true, Walls = true})
 	CPS = Killaura:CreateTwoSlider({
@@ -124,7 +199,7 @@ run(function()
 		Min = 1,
 		Max = 20,
 		DefaultMin = 12,
-		DefaultMax = 12
+		DefaultMax = 14
 	})
 	SwingRange = Killaura:CreateSlider({
 		Name = 'Swing range',
@@ -155,6 +230,24 @@ run(function()
 		Min = 1,
 		Max = 10,
 		Default = 10
+	})
+	SortMode = Killaura:CreateDropdown({
+		Name = 'Sort targets',
+		List = {'Distance', 'Health', 'Angle', 'None'},
+		Default = 'Distance'
+	})
+	Silent = Killaura:CreateToggle({
+		Name = 'Silent rotation',
+		Default = true,
+		Tooltip = 'Rotates attack direction without\nmoving your character visually'
+	})
+	SmoothRotation = Killaura:CreateToggle({
+		Name = 'Smooth rotation',
+		Tooltip = 'Smoothly rotates toward targets\ninstead of snapping instantly'
+	})
+	MultiSwing = Killaura:CreateToggle({
+		Name = 'Multi swing',
+		Tooltip = 'Attacks multiple targets per tick'
 	})
 	Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
 	Killaura:CreateToggle({
