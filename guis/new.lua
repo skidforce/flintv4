@@ -6572,7 +6572,7 @@ mainapi.HideVapeButton = guipane:CreateToggle({
 })
 guipane:CreateDropdown({
 	Name = 'GUI Theme',
-	List = {'new', 'old', 'rise', 'liquidbounce', 'wurst'},
+	List = {'new', 'old'},
 	Function = function(val, mouse)
 		if mouse then
 			writefile('flintv4/profiles/gui.txt', val)
@@ -6584,7 +6584,7 @@ guipane:CreateDropdown({
 			end
 		end
 	end,
-	Tooltip = 'new - The newest vape theme since v4.05\nold - The vape theme pre v4.05\nrise - Rise 6.0\nliquidbounce - LiquidBounce theme\nwurst - Wurst theme'
+	Tooltip = 'new - The newest vape theme since v4.05\nold - The vape theme pre v4.05'
 })
 mainapi.RainbowMode = guipane:CreateDropdown({
 	Name = 'Rainbow Mode',

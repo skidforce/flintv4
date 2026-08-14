@@ -359,6 +359,10 @@ end
 		writefile('flintv4/profiles/gui.txt', 'new')
 	end
 	local gui = readfile('flintv4/profiles/gui.txt')
+	if not table.find({'new', 'old'}, gui) then
+		gui = 'new'
+		writefile('flintv4/profiles/gui.txt', 'new')
+	end
 
 	if not isfolder('flintv4/assets/'..gui) then
 		makefolder('flintv4/assets/'..gui)

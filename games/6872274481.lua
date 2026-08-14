@@ -7027,6 +7027,27 @@ run(function()
 			end
 		})
 	end
+	SkinChanger:CreateButton({
+		Name = 'Randomize Skins',
+		Function = function()
+			for family, option in Options do
+				local members = groups[family]
+				if members then
+					local skinsForFamily = {}
+					for label in skins[members[1]] do
+						table.insert(skinsForFamily, label)
+					end
+					if #skinsForFamily > 0 then
+						option:Set(skinsForFamily[math.random(1, #skinsForFamily)])
+					end
+				end
+			end
+			if SkinChanger.Enabled then
+				applySkins()
+			end
+		end,
+		Tooltip = 'Assigns a random skin to every weapon'
+	})
 end)
 
 run(function()
