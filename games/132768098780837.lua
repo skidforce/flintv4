@@ -1173,3 +1173,35 @@ run(function()
 		Tooltip = 'Hide the shield entirely.'
 	})
 end)
+
+-- expose globals for extras
+getgenv().bw = bw
+getgenv().blocks = blocks
+getgenv().BlockTimes = BlockTimes
+getgenv().bwState = {isAttacking = false}
+
+do
+	local extrasPath = 'flintv4/games/blockwars_extras.lua'
+	local extrassource = isfile and isfile(extrasPath) and readfile(extrasPath) or nil
+	if not extrassource or extrassource:gsub('%s', '') == '' then
+		pcall(function()
+			local ok, res = pcall(function()
+				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/blockwars_extras.lua', true)
+			end)
+			if ok and res and res ~= '' and res ~= '404: Not Found' then
+				extrassource = res
+				pcall(writefile, extrasPath, '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res)
+			end
+		end)
+	end
+
+	if extrassource and extrassource:gsub('%s', '') ~= '' then
+		local ok, err = pcall(function()
+			local fn = loadstring(extrassource)
+			if fn then fn() end
+		end)
+		if not ok then
+			warn('[flintv4] failed to load blockwars extras: '..tostring(err))
+		end
+	end
+end
