@@ -59,25 +59,25 @@ local uipallet = {
 }
 
 local getcustomassets = {
-	['pistonware/assets/old/barlogo.png'] = 'rbxasset://barlogo.png',
-	['pistonware/assets/old/blatanticon.png'] = 'rbxasset://blatanticon.png',
-	['pistonware/assets/old/checkbox.png'] = 'rbxasset://checkbox.png',
-	['pistonware/assets/old/combaticon.png'] = 'rbxasset://combaticon.png',
-	['pistonware/assets/old/friendsicon.png'] = 'rbxasset://friendsicon.png',
-	['pistonware/assets/old/guiicon.png'] = 'rbxasset://guiicon.png',
-	['pistonware/assets/old/info.png'] = 'rbxasset://info.png',
-	['pistonware/assets/old/pin.png'] = 'rbxasset://pin.png',
-	['pistonware/assets/old/profilesicon.png'] = 'rbxasset://profilesicon.png',
-	['pistonware/assets/old/rendericon.png'] = 'rbxasset://rendericon.png',
-	['pistonware/assets/old/search.png'] = 'rbxasset://search.png',
-	['pistonware/assets/old/settingsicon.png'] = 'rbxasset://settingsicon.png',
-	['pistonware/assets/old/targetinfoicon.png'] = 'rbxasset://targetinfoicon.png',
-	['pistonware/assets/old/textguiicon.png'] = 'rbxasset://textguiicon.png',
-	['pistonware/assets/old/textv4.png'] = 'rbxasset://textv4.png',
-	['pistonware/assets/old/textvape.png'] = 'rbxasset://textvape.png',
-	['pistonware/assets/old/utilityicon.png'] = 'rbxasset://utilityicon.png',
-	['pistonware/assets/old/vape.png'] = 'rbxassetid://99295797606112',
-	['pistonware/assets/old/worldicon.png'] = 'rbxasset://worldicon.png'
+	['flintv4/assets/old/barlogo.png'] = 'rbxasset://barlogo.png',
+	['flintv4/assets/old/blatanticon.png'] = 'rbxasset://blatanticon.png',
+	['flintv4/assets/old/checkbox.png'] = 'rbxasset://checkbox.png',
+	['flintv4/assets/old/combaticon.png'] = 'rbxasset://combaticon.png',
+	['flintv4/assets/old/friendsicon.png'] = 'rbxasset://friendsicon.png',
+	['flintv4/assets/old/guiicon.png'] = 'rbxasset://guiicon.png',
+	['flintv4/assets/old/info.png'] = 'rbxasset://info.png',
+	['flintv4/assets/old/pin.png'] = 'rbxasset://pin.png',
+	['flintv4/assets/old/profilesicon.png'] = 'rbxasset://profilesicon.png',
+	['flintv4/assets/old/rendericon.png'] = 'rbxasset://rendericon.png',
+	['flintv4/assets/old/search.png'] = 'rbxasset://search.png',
+	['flintv4/assets/old/settingsicon.png'] = 'rbxasset://settingsicon.png',
+	['flintv4/assets/old/targetinfoicon.png'] = 'rbxasset://targetinfoicon.png',
+	['flintv4/assets/old/textguiicon.png'] = 'rbxasset://textguiicon.png',
+	['flintv4/assets/old/textv4.png'] = 'rbxasset://textv4.png',
+	['flintv4/assets/old/textvape.png'] = 'rbxasset://textvape.png',
+	['flintv4/assets/old/utilityicon.png'] = 'rbxasset://utilityicon.png',
+	['flintv4/assets/old/vape.png'] = 'rbxassetid://99295797606112',
+	['flintv4/assets/old/worldicon.png'] = 'rbxasset://worldicon.png'
 }
 
 local isfile = isfile or function(file)
@@ -233,7 +233,7 @@ local function downloadFile(path, func)
 	if not hasContent(path) then
 		createDownloader(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('pistonware/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('flintv4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -339,7 +339,7 @@ local function removeTags(str)
 end
 
 do
-	local res = isfile('pistonware/profiles/color.txt') and loadJson('pistonware/profiles/color.txt')
+	local res = isfile('flintv4/profiles/color.txt') and loadJson('flintv4/profiles/color.txt')
 	if res then
 		uipallet.Main = res.Main and Color3.fromRGB(unpack(res.Main)) or uipallet.Main
 		uipallet.Text = res.Text and Color3.fromRGB(unpack(res.Text)) or uipallet.Text
@@ -606,7 +606,7 @@ components = {
 		expand.Size = UDim2.fromOffset(9, 5)
 		expand.Position = UDim2.fromOffset(4, 4)
 		expand.BackgroundTransparency = 1
-		expand.Image = getcustomasset('pistonware/assets/new/expandicon.png')
+		expand.Image = getcustomasset('flintv4/assets/new/expandicon.png')
 		expand.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 		expand.Parent = expandbutton
 		local rainbow = Instance.new('TextButton')
@@ -1391,7 +1391,7 @@ components = {
 				local objectdotin = Instance.new('ImageLabel')
 				objectdotin.Size = UDim2.fromScale(1, 1)
 				objectdotin.BackgroundTransparency = 1
-				objectdotin.Image = getcustomasset('pistonware/assets/old/checkbox.png')
+				objectdotin.Image = getcustomasset('flintv4/assets/old/checkbox.png')
 				objectdotin.ImageColor3 = uipallet.Text
 				objectdotin.Parent = objectdot
 				local objecttitle = Instance.new('TextLabel')
@@ -1640,7 +1640,7 @@ components = {
 		arrow.Size = UDim2.fromOffset(12, 6)
 		arrow.Position = UDim2.new(1, -56, 0, 10)
 		arrow.BackgroundTransparency = 1
-		arrow.Image = getcustomasset('pistonware/assets/new/rangearrow.png')
+		arrow.Image = getcustomasset('flintv4/assets/new/rangearrow.png')
 		arrow.ImageColor3 = color.Light(uipallet.Main, 0.14)
 		arrow.Parent = slider
 		optionsettings.Function = optionsettings.Function or function() end
@@ -1831,7 +1831,7 @@ function mainapi:CreateBar()
 	logo.Size = UDim2.fromOffset(92, 25)
 	logo.Position = UDim2.fromOffset(11, 8)
 	logo.BackgroundTransparency = 1
-	logo.Image = getcustomasset('pistonware/assets/old/barlogo.png')
+	logo.Image = getcustomasset('flintv4/assets/old/barlogo.png')
 	logo.ImageColor3 = uipallet.Text
 	logo.Parent = bar
 	local settingsbutton = Instance.new('TextButton')
@@ -1847,7 +1847,7 @@ function mainapi:CreateBar()
 	settingsicon.Size = UDim2.fromOffset(26, 26)
 	settingsicon.Position = UDim2.fromOffset(4, 4)
 	settingsicon.BackgroundTransparency = 1
-	settingsicon.Image = getcustomasset('pistonware/assets/old/settingsicon.png')
+	settingsicon.Image = getcustomasset('flintv4/assets/old/settingsicon.png')
 	settingsicon.ImageColor3 = uipallet.Text
 	settingsicon.Parent = settingsbutton
 	local children = Instance.new('Frame')
@@ -1864,7 +1864,7 @@ function mainapi:CreateBar()
 	local searchbutton = settingsbutton:Clone()
 	searchbutton.Position = UDim2.fromOffset(144, 4)
 	searchbutton.Parent = bar
-	searchbutton.ImageLabel.Image = getcustomasset('pistonware/assets/old/search.png')
+	searchbutton.ImageLabel.Image = getcustomasset('flintv4/assets/old/search.png')
 
 	function categoryapi:CreateBind()
 		local optionapi = {}
@@ -2620,7 +2620,7 @@ function mainapi:CreateOverlay(categorysettings)
 	pin.Position = UDim2.new(1, -23, 0, 11)
 	pin.BackgroundTransparency = 1
 	pin.AutoButtonColor = false
-	pin.Image = getcustomasset('pistonware/assets/old/pin.png')
+	pin.Image = getcustomasset('flintv4/assets/old/pin.png')
 	pin.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 	pin.Parent = window
 	local customchildren = Instance.new('Frame')
@@ -2812,8 +2812,8 @@ function mainapi:CreateCategoryList(categorysettings)
 				if ind then
 					if val ~= 'default' then
 						table.remove(mainapi.Profiles, ind)
-						if isfile('pistonware/profiles/'..val..mainapi.Place..'.txt') and delfile then
-							delfile('pistonware/profiles/'..val..mainapi.Place..'.txt')
+						if isfile('flintv4/profiles/'..val..mainapi.Place..'.txt') and delfile then
+							delfile('flintv4/profiles/'..val..mainapi.Place..'.txt')
 						end
 					end
 				else
@@ -2938,7 +2938,7 @@ function mainapi:CreateCategoryList(categorysettings)
 				local objectdotin = Instance.new('ImageLabel')
 				objectdotin.Size = UDim2.fromScale(1, 1)
 				objectdotin.BackgroundTransparency = 1
-				objectdotin.Image = getcustomasset('pistonware/assets/old/checkbox.png')
+				objectdotin.Image = getcustomasset('flintv4/assets/old/checkbox.png')
 				objectdotin.ImageColor3 = uipallet.Text
 				objectdotin.Parent = objectdot
 				local objecttitle = Instance.new('TextLabel')
@@ -3077,7 +3077,7 @@ function mainapi:CreateNotification(title, text, duration, type)
 		iconshadow.Position = UDim2.fromOffset(1, 3)
 		iconshadow.ZIndex = 5
 		iconshadow.BackgroundTransparency = 1
-		iconshadow.Image = getcustomasset('pistonware/assets/old/info.png')
+		iconshadow.Image = getcustomasset('flintv4/assets/old/info.png')
 		iconshadow.ImageColor3 = Color3.new()
 		iconshadow.ImageTransparency = 0.5
 		iconshadow.Parent = notification
@@ -3152,11 +3152,11 @@ function mainapi:Load(skipgui, profile)
 	local guidata = {}
 	local savecheck = true
 
-	if isfile('pistonware/profiles/'..game.GameId..'.gui.txt') then
-		guidata = loadJson('pistonware/profiles/'..game.GameId..'.gui.txt')
+	if isfile('flintv4/profiles/'..game.GameId..'.gui.txt') then
+		guidata = loadJson('flintv4/profiles/'..game.GameId..'.gui.txt')
 		if not guidata then
 			guidata = {Categories = {}}
-			self:CreateNotification('Pistonware', 'Failed to load GUI settings.', 10, 'alert')
+			self:CreateNotification('FlintV4', 'Failed to load GUI settings.', 10, 'alert')
 			savecheck = false
 		end
 
@@ -3198,15 +3198,15 @@ function mainapi:Load(skipgui, profile)
 	}}
 	self.Categories.Profiles:ChangeValue()
 
-	if isfile('pistonware/profiles/'..self.Profile..self.Place..'.txt') then
-		local savedata = loadJson('pistonware/profiles/'..self.Profile..self.Place..'.txt')
+	if isfile('flintv4/profiles/'..self.Profile..self.Place..'.txt') then
+		local savedata = loadJson('flintv4/profiles/'..self.Profile..self.Place..'.txt')
 		if not savedata then
 			savedata = {
 				Categories = {},
 				Modules = {},
 				Legit = {}
 			}
-			self:CreateNotification('Pistonware', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
+			self:CreateNotification('FlintV4', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
 			savecheck = false
 		end
 
@@ -3295,7 +3295,7 @@ function mainapi:Load(skipgui, profile)
 		image.Size = UDim2.fromScale(0.8, 0.8)
 		image.Position = UDim2.fromScale(0.5, 0.5)
 		image.BackgroundTransparency = 1
-		image.Image = getcustomasset('pistonware/assets/old/vape.png')
+		image.Image = getcustomasset('flintv4/assets/old/vape.png')
 		image.Parent = button
 		local buttoncorner = Instance.new('UICorner')
 		buttoncorner.CornerRadius = UDim.new(1, 0)
@@ -3400,8 +3400,8 @@ function mainapi:Save(newprofile)
 		}
 	end
 
-	writefile('pistonware/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
-	writefile('pistonware/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
+	writefile('flintv4/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
+	writefile('flintv4/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
 end
 
 -- Switch the active profile. Save(name) snapshots the outgoing profile's modules and
@@ -3413,7 +3413,7 @@ end
 function mainapi:SetProfile(name)
 	pcall(function() self:Save(name) end)
 	pcall(function()
-		local guipath = 'pistonware/profiles/'..game.GameId..'.gui.txt'
+		local guipath = 'flintv4/profiles/'..game.GameId..'.gui.txt'
 		local guidata = isfile(guipath) and loadJson(guipath)
 		if type(guidata) ~= 'table' then return end
 		if guidata.Profile ~= name then
@@ -3570,45 +3570,45 @@ end))
 
 mainapi:CreateCategory({
 	Name = 'GUI',
-	Icon = getcustomasset('pistonware/assets/old/guiicon.png')
+	Icon = getcustomasset('flintv4/assets/old/guiicon.png')
 })
 local combat = mainapi:CreateCategory({
 	Name = 'Combat',
-	Icon = getcustomasset('pistonware/assets/old/combaticon.png')
+	Icon = getcustomasset('flintv4/assets/old/combaticon.png')
 })
 mainapi:CreateCategory({
 	Name = 'Blatant',
-	Icon = getcustomasset('pistonware/assets/old/blatanticon.png'),
+	Icon = getcustomasset('flintv4/assets/old/blatanticon.png'),
 	WindowSize = 164
 })
 mainapi:CreateCategory({
 	Name = 'Render',
-	Icon = getcustomasset('pistonware/assets/old/rendericon.png'),
+	Icon = getcustomasset('flintv4/assets/old/rendericon.png'),
 	WindowSize = 196
 })
 mainapi:CreateCategory({
 	Name = 'Utility',
-	Icon = getcustomasset('pistonware/assets/old/utilityicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/utilityicon.png'),
 	WindowSize = 164
 })
 mainapi:CreateCategory({
 	Name = 'World',
-	Icon = getcustomasset('pistonware/assets/old/worldicon.png')
+	Icon = getcustomasset('flintv4/assets/old/worldicon.png')
 })
 mainapi:CreateCategory({
 	Name = 'Inventory',
-	Icon = getcustomasset('pistonware/assets/old/worldicon.png')
+	Icon = getcustomasset('flintv4/assets/old/worldicon.png')
 })
 mainapi:CreateCategory({
 	Name = 'Minigames',
-	Icon = getcustomasset('pistonware/assets/old/worldicon.png')
+	Icon = getcustomasset('flintv4/assets/old/worldicon.png')
 })
 mainapi.Legit = mainapi:CreateLegit({
 	Name = 'Legit'
 })
 local settingspane = mainapi:CreateCategory({
 	Name = 'Settings',
-	Icon = getcustomasset('pistonware/assets/old/settingsicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/settingsicon.png'),
 	WindowSize = 166
 })
 
@@ -3624,7 +3624,7 @@ local friendscolor = {
 }
 local friendssettings = {
 	Name = 'Friends',
-	Icon = getcustomasset('pistonware/assets/old/friendsicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/friendsicon.png'),
 	Placeholder = 'Roblox username',
 	WindowSize = 250,
 	Function = function()
@@ -3669,13 +3669,13 @@ mainapi:Clean(friends.ColorUpdate)
 ]]
 local profilescategory = mainapi:CreateCategoryList({
 	Name = 'Profiles',
-	Icon = getcustomasset('pistonware/assets/old/profilesicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/profilesicon.png'),
 	Placeholder = 'Type name',
 	WindowSize = 250,
 	Profiles = true
 })
 
--- Redownloads pistonware/profiles the way loader.lua does on a first install: every file the
+-- Redownloads flintv4/profiles the way loader.lua does on a first install: every file the
 -- repo keeps in that folder, pulled from the raw host through the same 4-attempt retry (raw
 -- hosts 504 intermittently, and an empty body would otherwise land as a corrupt file).
 -- Two things differ from loader.lua's downloadFile, both required for a sync rather than an
@@ -3683,11 +3683,11 @@ local profilescategory = mainapi:CreateCategoryList({
 -- sync would download nothing at all), and nothing is filtered out. <GameId>.gui.txt carries
 -- the config's GUI theme colour and window layout, so holding it back was what made a synced
 -- config come back looking exactly like the one it replaced.
--- pistonware/profiles is stamped with the commit it was pulled from, so a sync that would
+-- flintv4/profiles is stamped with the commit it was pulled from, so a sync that would
 -- change nothing can be turned away before it spends any requests finding that out. Nothing
 -- else in the codebase reads profilecommit.txt; this is what writes it.
 local function localProfileCommit()
-	local suc, res = pcall(readfile, 'pistonware/profiles/profilecommit.txt')
+	local suc, res = pcall(readfile, 'flintv4/profiles/profilecommit.txt')
 	if not (suc and type(res) == 'string') then return nil end
 	res = res:gsub('%s', '')
 	return res ~= '' and res or nil
@@ -3708,14 +3708,14 @@ end
 -- Being on the latest commit is not enough on its own: the sync exists to put both shipped
 -- configs for this place on disk, so a missing one has to let it through regardless.
 local function hasBothConfigs()
-	return isfile('pistonware/profiles/blatant'..mainapi.Place..'.txt') and isfile('pistonware/profiles/legit'..mainapi.Place..'.txt')
+	return isfile('flintv4/profiles/blatant'..mainapi.Place..'.txt') and isfile('flintv4/profiles/legit'..mainapi.Place..'.txt')
 end
 
 -- Pinned to the commit the check reported rather than to the branch path: raw.githubusercontent
 -- serves CDN-cached content for a few minutes after a push, so a branch-head fetch can quietly
 -- reinstall the old profiles and then get stamped with the new commit, blocking every later sync.
 local function downloadProfileFile(path, commit)
-	local relPath = select(1, path:gsub('pistonware/', ''))
+	local relPath = select(1, path:gsub('flintv4/', ''))
 	local content
 	for attempt = 1, 4 do
 		local suc, res = pcall(function()
@@ -3786,7 +3786,7 @@ local function downloadProfiles(commit)
 	local done = Instance.new('BindableEvent')
 	for _, v in files do
 		task.spawn(function()
-			if downloadProfileFile('pistonware/'.. ({v.path:gsub(' ', '%%20')})[1], commit) then
+			if downloadProfileFile('flintv4/'.. ({v.path:gsub(' ', '%%20')})[1], commit) then
 				synced += 1
 			else
 				failed += 1
@@ -3871,7 +3871,7 @@ do
 		if latest and latest == localProfileCommit() and hasBothConfigs() then
 			syncing = false
 			synctitle.Text = 'Profiles already up to date'
-			mainapi:CreateNotification('Pistonware', 'Profiles are already on the latest commit, nothing to sync.', 10)
+			mainapi:CreateNotification('FlintV4', 'Profiles are already on the latest commit, nothing to sync.', 10)
 			return
 		end
 
@@ -3884,13 +3884,13 @@ do
 		syncing = false
 		if not synced then
 			synctitle.Text = 'Sync to current profiles'
-			mainapi:CreateNotification('Pistonware', message, 10, 'alert')
+			mainapi:CreateNotification('FlintV4', message, 10, 'alert')
 			return
 		end
 		-- Stamped only once the files are down, and only when the commit was readable in the first
 		-- place, so a half-finished or unverified sync still re-checks next time.
 		if latest then
-			pcall(writefile, 'pistonware/profiles/profilecommit.txt', latest)
+			pcall(writefile, 'flintv4/profiles/profilecommit.txt', latest)
 		end
 
 		-- Saving stops here rather than at the reload. main.lua autosaves every few seconds, and
@@ -3904,7 +3904,7 @@ do
 		pending, syncmessage = true, message
 		synctitle.Text = 'Synced, choose a config'
 		refreshConfigButtons()
-		mainapi:CreateNotification('Pistonware', message..' Choose Blatant or Legit below to load one.', 10)
+		mainapi:CreateNotification('FlintV4', message..' Choose Blatant or Legit below to load one.', 10)
 	end)
 
 	-- Which shipped config loads by default. There is nothing extra to persist: the default is
@@ -3947,7 +3947,7 @@ do
 			-- A config can only be offered once its file is on disk: before the first sync there
 			-- may be none at all, so the row hides itself rather than showing a button whose only
 			-- possible answer is an error.
-			button.Visible = pending or isfile('pistonware/profiles/'..name..mainapi.Place..'.txt')
+			button.Visible = pending or isfile('flintv4/profiles/'..name..mainapi.Place..'.txt')
 			anyvisible = anyvisible or button.Visible
 		end
 		-- an invisible row is skipped by the list layout, so the gap closes with it
@@ -3956,8 +3956,8 @@ do
 	end
 
 	local function selectConfig(name)
-		if not isfile('pistonware/profiles/'..name..mainapi.Place..'.txt') then
-			mainapi:CreateNotification('Pistonware', 'There is no '..name..' config for this game yet, press Sync to current profiles first.', 10, 'alert')
+		if not isfile('flintv4/profiles/'..name..mainapi.Place..'.txt') then
+			mainapi:CreateNotification('FlintV4', 'There is no '..name..' config for this game yet, press Sync to current profiles first.', 10, 'alert')
 			return
 		end
 		-- Always a full reload, never an in-place profile switch. The GUI theme colour, window
@@ -3975,7 +3975,7 @@ do
 		-- config has to be written in there directly. Going through Save instead would rewrite the
 		-- profile file a download just refreshed.
 		pcall(function()
-			local guipath = 'pistonware/profiles/'..game.GameId..'.gui.txt'
+			local guipath = 'flintv4/profiles/'..game.GameId..'.gui.txt'
 			local guidata = isfile(guipath) and loadJson(guipath)
 			if type(guidata) ~= 'table' then return end
 			guidata.Profiles = guidata.Profiles or {}
@@ -3993,11 +3993,11 @@ do
 			writefile(guipath, httpService:JSONEncode(guidata))
 		end)
 		-- nil unless a sync is being finished off, which is the only time main.lua should report one
-		shared.PistonwareSyncResult = syncmessage
+		shared.FlintV4SyncResult = syncmessage
 		shared.VapeCustomProfile = name
 		shared.vapereload = true
-		if shared.PistonwareDeveloper then
-			loadstring(readfile('pistonware/loader.lua'), 'loader')()
+		if shared.FlintV4Developer then
+			loadstring(readfile('flintv4/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 		end
@@ -4058,7 +4058,7 @@ end
 local targets
 targets = mainapi:CreateCategoryList({
 	Name = 'Targets',
-	Icon = getcustomasset('pistonware/assets/old/friendsicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/friendsicon.png'),
 	Placeholder = 'Roblox username',
 	WindowSize = 250,
 	Function = function()
@@ -4203,7 +4203,7 @@ scaleslider = topbar:CreateSlider({
 	Visible = false
 })
 mainapi.HideVapeButton = topbar:CreateToggle({
-	Name = 'Hide Pistonware Mobile Button',
+	Name = 'Hide FlintV4 Mobile Button',
 	Function = function(callback)
 		-- Drops the transparencies rather than flipping Visible. An invisible
 		-- GuiObject stops hit-testing in Roblox, so hiding the button used to take
@@ -4217,17 +4217,17 @@ mainapi.HideVapeButton = topbar:CreateToggle({
 			end
 		end
 	end,
-	Tooltip = 'Makes the Pistonware button invisible on mobile\nIt still opens the GUI when tapped'
+	Tooltip = 'Makes the FlintV4 button invisible on mobile\nIt still opens the GUI when tapped'
 })
 topbar:CreateDropdown({
 	Name = 'GUI Theme',
 	List = inputService.TouchEnabled and {'new', 'old'} or {'new', 'old', 'rise'},
 	Function = function(val, mouse)
 		if mouse then
-			writefile('pistonware/profiles/gui.txt', val)
+			writefile('flintv4/profiles/gui.txt', val)
 			shared.vapereload = true
-			if shared.PistonwareDeveloper then
-				loadstring(readfile('pistonware/loader.lua'), 'loader')()
+			if shared.FlintV4Developer then
+				loadstring(readfile('flintv4/loader.lua'), 'loader')()
 			else
 				loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 			end
@@ -4260,12 +4260,12 @@ topbar:CreateButton({
 	Name = 'Reset current profile',
 	Function = function()
 	mainapi.Save = function() end
-		if isfile('pistonware/profiles/'..mainapi.Profile..mainapi.Place..'.txt') and delfile then
-			delfile('pistonware/profiles/'..mainapi.Profile..mainapi.Place..'.txt')
+		if isfile('flintv4/profiles/'..mainapi.Profile..mainapi.Place..'.txt') and delfile then
+			delfile('flintv4/profiles/'..mainapi.Profile..mainapi.Place..'.txt')
 		end
 		shared.vapereload = true
-		if shared.PistonwareDeveloper then
-			loadstring(readfile('pistonware/loader.lua'), 'loader')()
+		if shared.FlintV4Developer then
+			loadstring(readfile('flintv4/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 		end
@@ -4328,8 +4328,8 @@ topbar:CreateButton({
 	Name = 'REINEJCT',
 	Function = function()
 		shared.vapereload = true
-		if shared.PistonwareDeveloper then
-			loadstring(readfile('pistonware/loader.lua'), 'loader')()
+		if shared.FlintV4Developer then
+			loadstring(readfile('flintv4/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 		end
@@ -4341,7 +4341,7 @@ topbar:CreateButton({
 	Function = function()
 		loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/refs/heads/main/reinstall.lua', true))()
 	end,
-	Tooltip = 'Uninjects, deletes the pistonware folder and downloads everything again'
+	Tooltip = 'Uninjects, deletes the flintv4 folder and downloads everything again'
 })
 topbar:CreateBind()
 
@@ -4512,7 +4512,7 @@ mainapi.Libraries.targetinfo = targetinfo
 
 local textgui = mainapi:CreateOverlay({
 	Name = 'Text GUI',
-	Icon = getcustomasset('pistonware/assets/old/textguiicon.png'),
+	Icon = getcustomasset('flintv4/assets/old/textguiicon.png'),
 	WindowSize = 178,
 	Function = function()
 		mainapi:UpdateTextGUI()
@@ -4600,7 +4600,7 @@ VapeLogo.BackgroundTransparency = 1
 VapeLogo.BorderSizePixel = 0
 VapeLogo.Visible = true
 VapeLogo.BackgroundColor3 = Color3.new()
-VapeLogo.Image = getcustomasset('pistonware/assets/old/textvape.png')
+VapeLogo.Image = getcustomasset('flintv4/assets/old/textvape.png')
 VapeLogo.Parent = textgui.Children
 
 local lastside = textgui.Children.AbsolutePosition.X > (gui.AbsoluteSize.X / 2)
@@ -4622,7 +4622,7 @@ VapeLogoV4.Position = UDim2.new(1, 1, 0, -2)
 VapeLogoV4.BackgroundColor3 = Color3.new()
 VapeLogoV4.BackgroundTransparency = 1
 VapeLogoV4.BorderSizePixel = 0
-VapeLogoV4.Image = getcustomasset('pistonware/assets/old/textv4.png')
+VapeLogoV4.Image = getcustomasset('flintv4/assets/old/textv4.png')
 VapeLogoV4.Parent = VapeLogo
 local VapeLogoShadow = VapeLogo:Clone()
 VapeLogoShadow.Position = UDim2.fromOffset(1, 1)

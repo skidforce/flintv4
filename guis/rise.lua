@@ -120,9 +120,9 @@ local themecolors = {
 }
 
 local getcustomassets = {
-	['pistonware/assets/rise/slice.png'] = 'rbxasset://risesix/slice.png',
-	['pistonware/assets/rise/blur.png'] = 'rbxasset://risesix/blur.png',
-	['pistonware/assets/new/blur.png'] = 'rbxassetid://14898786664',
+	['flintv4/assets/rise/slice.png'] = 'rbxasset://risesix/slice.png',
+	['flintv4/assets/rise/blur.png'] = 'rbxasset://risesix/blur.png',
+	['flintv4/assets/new/blur.png'] = 'rbxassetid://14898786664',
 }
 
 local isfile = isfile or function(file)
@@ -147,7 +147,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 42, 1, 42)
 	blur.Position = UDim2.fromOffset(-24, -15)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('pistonware/assets/new/blur.png')
+	blur.Image = getcustomasset('flintv4/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(44, 38, 804, 595)
 	blur.Parent = parent
@@ -253,7 +253,7 @@ local function downloadFile(path, func)
 	if not hasContent(path) then
 		createDownloader(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('pistonware/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('flintv4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -355,21 +355,21 @@ end
 
 local function writeFont()
 	if not assetfunction then return 'rbxasset://fonts/productsans.json' end
-	writefile('pistonware/assets/rise/risefont.json', httpService:JSONEncode({
+	writefile('flintv4/assets/rise/risefont.json', httpService:JSONEncode({
 		name = 'ProductSans',
 		faces = {
-			{style = 'normal', assetId = getcustomasset('pistonware/assets/rise/SF-Pro-Rounded-Light.otf'), name = 'Light', weight = 300},
-			{style = 'normal', assetId = getcustomasset('pistonware/assets/rise/SF-Pro-Rounded-Regular.otf'), name = 'Regular', weight = 400},
-			{style = 'normal', assetId = getcustomasset('pistonware/assets/rise/SF-Pro-Rounded-Medium.otf'), name = 'Medium', weight = 500},
-			{style = 'normal', assetId = getcustomasset('pistonware/assets/rise/Icon-1.ttf'), name = 'Icon1', weight = 600},
-			{style = 'normal', assetId = getcustomasset('pistonware/assets/rise/Icon-3.ttf'), name = 'Icon3', weight = 800}
+			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Light.otf'), name = 'Light', weight = 300},
+			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Regular.otf'), name = 'Regular', weight = 400},
+			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Medium.otf'), name = 'Medium', weight = 500},
+			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/Icon-1.ttf'), name = 'Icon1', weight = 600},
+			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/Icon-3.ttf'), name = 'Icon3', weight = 800}
 		}
 	}))
-	return getcustomasset('pistonware/assets/rise/risefont.json')
+	return getcustomasset('flintv4/assets/rise/risefont.json')
 end
 
 if inputService.TouchEnabled then
-	writefile('pistonware/profiles/gui.txt', 'new')
+	writefile('flintv4/profiles/gui.txt', 'new')
 	return
 end
 
@@ -381,7 +381,7 @@ do
 	uipallet.FontIcon1 = Font.new(risefont, Enum.FontWeight.SemiBold)
 	uipallet.FontIcon3 = Font.new(risefont, Enum.FontWeight.ExtraBold)
 
-	local res = isfile('pistonware/profiles/color.txt') and loadJson('pistonware/profiles/color.txt')
+	local res = isfile('flintv4/profiles/color.txt') and loadJson('flintv4/profiles/color.txt')
 	if res then
 		uipallet.Main = res.Main and Color3.fromRGB(unpack(res.Main)) or uipallet.Main
 		uipallet.Text = res.Text and Color3.fromRGB(unpack(res.Text)) or uipallet.Text
@@ -1224,8 +1224,8 @@ components = {
 					if ind then
 						if val ~= 'default' then
 							table.remove(mainapi.Profiles, ind)
-							if isfile('pistonware/profiles/'..val..mainapi.Place..'.txt') and delfile then
-								delfile('pistonware/profiles/'..val..mainapi.Place..'.txt')
+							if isfile('flintv4/profiles/'..val..mainapi.Place..'.txt') and delfile then
+								delfile('flintv4/profiles/'..val..mainapi.Place..'.txt')
 							end
 						end
 					else
@@ -2332,11 +2332,11 @@ function mainapi:Load(skipgui, profile)
 	local guidata = {}
 	local savecheck = true
 
-	if isfile('pistonware/profiles/'..game.GameId..'.gui.txt') then
-		guidata = loadJson('pistonware/profiles/'..game.GameId..'.gui.txt')
+	if isfile('flintv4/profiles/'..game.GameId..'.gui.txt') then
+		guidata = loadJson('flintv4/profiles/'..game.GameId..'.gui.txt')
 		if not guidata then
 			guidata = {Categories = {}}
-			self:CreateNotification('Pistonware', 'Failed to load GUI settings.', 10, 'alert')
+			self:CreateNotification('FlintV4', 'Failed to load GUI settings.', 10, 'alert')
 			savecheck = false
 		end
 
@@ -2364,15 +2364,15 @@ function mainapi:Load(skipgui, profile)
 	}}
 	--self.Categories.Profiles:ChangeValue()
 
-	if isfile('pistonware/profiles/'..self.Profile..self.Place..'.txt') then
-		local savedata = loadJson('pistonware/profiles/'..self.Profile..self.Place..'.txt')
+	if isfile('flintv4/profiles/'..self.Profile..self.Place..'.txt') then
+		local savedata = loadJson('flintv4/profiles/'..self.Profile..self.Place..'.txt')
 		if not savedata then
 			savedata = {
 				Categories = {},
 				Modules = {},
 				Legit = {}
 			}
-			self:CreateNotification('Pistonware', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
+			self:CreateNotification('FlintV4', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
 			savecheck = false
 		end
 
@@ -2488,8 +2488,8 @@ function mainapi:Save(newprofile)
 		}
 	end
 
-	writefile('pistonware/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
-	writefile('pistonware/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
+	writefile('flintv4/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
+	writefile('flintv4/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
 end
 
 -- Switch the active profile. Save(name) snapshots the outgoing profile's modules and
@@ -2501,7 +2501,7 @@ end
 function mainapi:SetProfile(name)
 	pcall(function() self:Save(name) end)
 	pcall(function()
-		local guipath = 'pistonware/profiles/'..game.GameId..'.gui.txt'
+		local guipath = 'flintv4/profiles/'..game.GameId..'.gui.txt'
 		local guidata = isfile(guipath) and loadJson(guipath)
 		if type(guidata) ~= 'table' then return end
 		if guidata.Profile ~= name then
@@ -2752,7 +2752,7 @@ local profilescategory = mainapi:CreateCategoryProfile({
 	Placeholder = 'Type name'
 })
 
--- Redownloads pistonware/profiles the way loader.lua does on a first install: every file the
+-- Redownloads flintv4/profiles the way loader.lua does on a first install: every file the
 -- repo keeps in that folder, pulled from the raw host through the same 4-attempt retry (raw
 -- hosts 504 intermittently, and an empty body would otherwise land as a corrupt file).
 -- Two things differ from loader.lua's downloadFile, both required for a sync rather than an
@@ -2760,11 +2760,11 @@ local profilescategory = mainapi:CreateCategoryProfile({
 -- sync would download nothing at all), and nothing is filtered out. <GameId>.gui.txt carries
 -- the config's GUI theme colour and window layout, so holding it back was what made a synced
 -- config come back looking exactly like the one it replaced.
--- pistonware/profiles is stamped with the commit it was pulled from, so a sync that would
+-- flintv4/profiles is stamped with the commit it was pulled from, so a sync that would
 -- change nothing can be turned away before it spends any requests finding that out. Nothing
 -- else in the codebase reads profilecommit.txt; this is what writes it.
 local function localProfileCommit()
-	local suc, res = pcall(readfile, 'pistonware/profiles/profilecommit.txt')
+	local suc, res = pcall(readfile, 'flintv4/profiles/profilecommit.txt')
 	if not (suc and type(res) == 'string') then return nil end
 	res = res:gsub('%s', '')
 	return res ~= '' and res or nil
@@ -2785,14 +2785,14 @@ end
 -- Being on the latest commit is not enough on its own: the sync exists to put both shipped
 -- configs for this place on disk, so a missing one has to let it through regardless.
 local function hasBothConfigs()
-	return isfile('pistonware/profiles/blatant'..mainapi.Place..'.txt') and isfile('pistonware/profiles/legit'..mainapi.Place..'.txt')
+	return isfile('flintv4/profiles/blatant'..mainapi.Place..'.txt') and isfile('flintv4/profiles/legit'..mainapi.Place..'.txt')
 end
 
 -- Pinned to the commit the check reported rather than to the branch path: raw.githubusercontent
 -- serves CDN-cached content for a few minutes after a push, so a branch-head fetch can quietly
 -- reinstall the old profiles and then get stamped with the new commit, blocking every later sync.
 local function downloadProfileFile(path, commit)
-	local relPath = select(1, path:gsub('pistonware/', ''))
+	local relPath = select(1, path:gsub('flintv4/', ''))
 	local content
 	for attempt = 1, 4 do
 		local suc, res = pcall(function()
@@ -2863,7 +2863,7 @@ local function downloadProfiles(commit)
 	local done = Instance.new('BindableEvent')
 	for _, v in files do
 		task.spawn(function()
-			if downloadProfileFile('pistonware/'.. ({v.path:gsub(' ', '%%20')})[1], commit) then
+			if downloadProfileFile('flintv4/'.. ({v.path:gsub(' ', '%%20')})[1], commit) then
 				synced += 1
 			else
 				failed += 1
@@ -2939,7 +2939,7 @@ do
 		if latest and latest == localProfileCommit() and hasBothConfigs() then
 			syncing = false
 			synctitle.Text = 'Profiles already up to date'
-			mainapi:CreateNotification('Pistonware', 'Profiles are already on the latest commit, nothing to sync.', 10)
+			mainapi:CreateNotification('FlintV4', 'Profiles are already on the latest commit, nothing to sync.', 10)
 			return
 		end
 
@@ -2952,13 +2952,13 @@ do
 		syncing = false
 		if not synced then
 			synctitle.Text = 'Sync to current profiles'
-			mainapi:CreateNotification('Pistonware', message, 10, 'alert')
+			mainapi:CreateNotification('FlintV4', message, 10, 'alert')
 			return
 		end
 		-- Stamped only once the files are down, and only when the commit was readable in the first
 		-- place, so a half-finished or unverified sync still re-checks next time.
 		if latest then
-			pcall(writefile, 'pistonware/profiles/profilecommit.txt', latest)
+			pcall(writefile, 'flintv4/profiles/profilecommit.txt', latest)
 		end
 
 		-- Saving stops here rather than at the reload. main.lua autosaves every few seconds, and
@@ -2972,7 +2972,7 @@ do
 		pending, syncmessage = true, message
 		synctitle.Text = 'Synced, choose a config'
 		refreshConfigButtons()
-		mainapi:CreateNotification('Pistonware', message..' Choose Blatant or Legit below to load one.', 10)
+		mainapi:CreateNotification('FlintV4', message..' Choose Blatant or Legit below to load one.', 10)
 	end)
 
 	-- Which shipped config loads by default. There is nothing extra to persist: the default is
@@ -3032,7 +3032,7 @@ do
 			-- A config can only be offered once its file is on disk: before the first sync there
 			-- may be none at all, so the row hides itself rather than showing a button whose only
 			-- possible answer is an error.
-			button.Visible = pending or isfile('pistonware/profiles/'..name..mainapi.Place..'.txt')
+			button.Visible = pending or isfile('flintv4/profiles/'..name..mainapi.Place..'.txt')
 			anyvisible = anyvisible or button.Visible
 		end
 		-- an invisible row is skipped by the list layout, so the gap closes with it
@@ -3041,8 +3041,8 @@ do
 	end
 
 	local function selectConfig(name)
-		if not isfile('pistonware/profiles/'..name..mainapi.Place..'.txt') then
-			mainapi:CreateNotification('Pistonware', 'There is no '..name..' config for this game yet, press Sync to current profiles first.', 10, 'alert')
+		if not isfile('flintv4/profiles/'..name..mainapi.Place..'.txt') then
+			mainapi:CreateNotification('FlintV4', 'There is no '..name..' config for this game yet, press Sync to current profiles first.', 10, 'alert')
 			return
 		end
 		-- Always a full reload, never an in-place profile switch. The GUI theme colour, window
@@ -3060,7 +3060,7 @@ do
 		-- config has to be written in there directly. Going through Save instead would rewrite the
 		-- profile file a download just refreshed.
 		pcall(function()
-			local guipath = 'pistonware/profiles/'..game.GameId..'.gui.txt'
+			local guipath = 'flintv4/profiles/'..game.GameId..'.gui.txt'
 			local guidata = isfile(guipath) and loadJson(guipath)
 			if type(guidata) ~= 'table' then return end
 			guidata.Profiles = guidata.Profiles or {}
@@ -3078,11 +3078,11 @@ do
 			writefile(guipath, httpService:JSONEncode(guidata))
 		end)
 		-- nil unless a sync is being finished off, which is the only time main.lua should report one
-		shared.PistonwareSyncResult = syncmessage
+		shared.FlintV4SyncResult = syncmessage
 		shared.VapeCustomProfile = name
 		shared.vapereload = true
-		if shared.PistonwareDeveloper then
-			loadstring(readfile('pistonware/loader.lua'), 'loader')()
+		if shared.FlintV4Developer then
+			loadstring(readfile('flintv4/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 		end
@@ -3287,10 +3287,10 @@ mainapi.Categories.Main:CreateDropdown({
 	List = {'rise', 'new', 'old'},
 	Function = function(val, mouse)
 		if mouse then
-			writefile('pistonware/profiles/gui.txt', val)
+			writefile('flintv4/profiles/gui.txt', val)
 			shared.vapereload = true
-			if shared.PistonwareDeveloper then
-				loadstring(readfile('pistonware/loader.lua'), 'loader')()
+			if shared.FlintV4Developer then
+				loadstring(readfile('flintv4/loader.lua'), 'loader')()
 			else
 				loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 			end
@@ -3317,8 +3317,8 @@ mainapi.Categories.Main:CreateButton({
 	Name = 'Reinject',
 	Function = function()
 		shared.vapereload = true
-		if shared.PistonwareDeveloper then
-			loadstring(readfile('pistonware/loader.lua'), 'loader')()
+		if shared.FlintV4Developer then
+			loadstring(readfile('flintv4/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/loader.lua', true))()
 		end
@@ -3683,7 +3683,7 @@ function mainapi:UpdateTextGUI(afterload)
 					holderline.Size = UDim2.fromOffset(2, 18)
 					holderline.Position = UDim2.new(1, 0, 0, 2)
 					holderline.BackgroundTransparency = 1
-					holderline.Image = getcustomasset('pistonware/assets/rise/slice.png')
+					holderline.Image = getcustomasset('flintv4/assets/rise/slice.png')
 					holderline.ImageColor3 = uipallet.MainColor
 					holderline.ZIndex = -1
 					holderline.Parent = holderbackground

@@ -1,8 +1,3 @@
-if not shared.PistonwareAuthenticated then
-	warn('[pistonware] not authenticated -- run the pistonware loader and enter your key')
-	return
-end
-
 -- Every module in this file and in bedwars.lua is registered inside one of these -- 60 blocks
 -- here, 59 there, all at top level, and bedwars.lua takes this same function through bw.run.
 -- Unprotected, an error anywhere in any of them aborted the rest of the file: every module
@@ -14,7 +9,7 @@ local run = function(func)
 	if shared.VapeSmoothBoot then task.wait() end
 	local ok, err = pcall(func)
 	if not ok then
-		warn('[pistonware] a module block failed to load: '..tostring(err))
+		warn('[flintv4] a module block failed to load: '..tostring(err))
 	end
 end
 
@@ -137,7 +132,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 89, 1, 52)
 	blur.Position = UDim2.fromOffset(-48, -31)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('pistonware/assets/new/blur.png')
+	blur.Image = getcustomasset('flintv4/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(52, 31, 261, 502)
 	blur.Parent = parent
@@ -812,7 +807,7 @@ run(function()
 end)
 entitylib.start()
 
--- pistonware funcs
+-- flintv4 funcs
 
 local genv = getgenv()
 -- Idempotent shared-state defaults: fill a key only if a previous execution
@@ -1047,7 +1042,7 @@ local function resolveSoundManager()
     return setmetatable({}, {__index = function() return blankFunction end})
 end
 
--- pistonware funcs
+-- flintv4 funcs
 
 run(function()
 	local KnitInit, Knit
@@ -1069,7 +1064,7 @@ run(function()
 		local started, value = pcall(debug.getupvalue, Knit.Start, 1)
 		if started and value then break end
 		if os.clock() > knitDeadline then
-			warn('[pistonware] Knit did not finish starting within 60s -- loading anyway')
+			warn('[flintv4] Knit did not finish starting within 60s -- loading anyway')
 			break
 		end
 		task.wait()
@@ -1200,7 +1195,7 @@ run(function()
 	for i, v in remoteNames do
 		local remote = dumpRemote(debug.getconstants(v))
 		if remote == '' then
-			--notif('Pistonware', 'Failed to grab remote ('..i..')', 10, 'alert')
+			--notif('FlintV4', 'Failed to grab remote ('..i..')', 10, 'alert')
 		end
 		remotes[i] = remote
 	end
@@ -5998,7 +5993,7 @@ run(function()
 		close.Position = UDim2.new(1, -35, 0, 9)
 		close.BackgroundColor3 = Color3.new(1, 1, 1)
 		close.BackgroundTransparency = 1
-		close.Image = getcustomasset('pistonware/assets/new/close.png')
+		close.Image = getcustomasset('flintv4/assets/new/close.png')
 		close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 		close.ImageTransparency = 0.5
 		close.AutoButtonColor = false
@@ -6112,7 +6107,7 @@ run(function()
 		searchicon.Size = UDim2.fromOffset(14, 14)
 		searchicon.Position = UDim2.new(1, -26, 0, 8)
 		searchicon.BackgroundTransparency = 1
-		searchicon.Image = getcustomasset('pistonware/assets/new/search.png')
+		searchicon.Image = getcustomasset('flintv4/assets/new/search.png')
 		searchicon.ImageColor3 = color.Light(uipallet.Main, 0.37)
 		searchicon.Parent = searchbkg
 		local children = Instance.new('ScrollingFrame')
@@ -6253,7 +6248,7 @@ run(function()
 		textbuttonicon.Position = UDim2.fromScale(0.5, 0.5)
 		textbuttonicon.AnchorPoint = Vector2.new(0.5, 0.5)
 		textbuttonicon.BackgroundTransparency = 1
-		textbuttonicon.Image = getcustomasset('pistonware/assets/new/add.png')
+		textbuttonicon.Image = getcustomasset('flintv4/assets/new/add.png')
 		textbuttonicon.ImageColor3 = Color3.fromHSV(0.46, 0.96, 0.52)
 		textbuttonicon.Parent = textbutton
 		local childrenlist = Instance.new('Frame')
@@ -6346,7 +6341,7 @@ run(function()
 			close.Position = UDim2.new(1, -23, 0, 6)
 			close.BackgroundColor3 = Color3.new(1, 1, 1)
 			close.BackgroundTransparency = 1
-			close.Image = getcustomasset('pistonware/assets/new/closemini.png')
+			close.Image = getcustomasset('flintv4/assets/new/closemini.png')
 			close.ImageColor3 = color.Light(uipallet.Text, 0.2)
 			close.ImageTransparency = 0.5
 			close.AutoButtonColor = false
@@ -8060,7 +8055,7 @@ shared.bedwars = {
 
       * A cached copy whose recorded commit sha still matched was returned as-is. Editing the
         file did not change the sha, so a tampered cache survived every update check.
-      * Honouring shared.PistonwareDeveloper returned the local file without making a request at
+      * Honouring shared.FlintV4Developer returned the local file without making a request at
         all -- which, before the payload validated its own key, meant a dumped or rewritten
         bedwars.lua could run unkeyed forever.
 
@@ -8082,7 +8077,7 @@ local function downloadBedwars()
     --
     -- It was removed because a local payload meant ZERO contact with LuaArmor. The published
     -- loader ships plaintext, so anyone could set the developer flag, drop any bedwars.lua at
-    -- this path, and have pistonware execute it forever -- unkeyed, with no request that could
+    -- this path, and have flintv4 execute it forever -- unkeyed, with no request that could
     -- ever notice.
     --
     -- It is back because bedwars.lua now validates its own key (the session block at the top
@@ -8092,20 +8087,20 @@ local function downloadBedwars()
     -- and stripped, and for them it is a convenience rather than a capability: anyone holding a
     -- working stripped payload has no need of this loader to run it.
     --
-    -- PUBLIC_BUILD nulls shared.PistonwareDeveloper and locks it behind a metatable, so this
+    -- PUBLIC_BUILD nulls shared.FlintV4Developer and locks it behind a metatable, so this
     -- branch is unreachable from the published loader unless that loader is itself edited.
-    if shared.PistonwareDeveloper then
+    if shared.FlintV4Developer then
         local suc, res = pcall(function()
-            if not isfile('pistonware/games/bedwars.lua') then return nil end
-            return readfile('pistonware/games/bedwars.lua')
+            if not isfile('flintv4/games/bedwars.lua') then return nil end
+            return readfile('flintv4/games/bedwars.lua')
         end)
         if suc and res and res ~= '' and loadstring(res) ~= nil then
-            warn('[pistonware] developer mode: running local games/bedwars.lua (not the published build)')
+            warn('[flintv4] developer mode: running local games/bedwars.lua (not the published build)')
             return res
         end
         -- Falls through to the network rather than failing: a developer with no local copy, or
         -- one that does not compile, still wants a working script.
-        warn('[pistonware] developer mode: no usable local games/bedwars.lua -- using the published build')
+        warn('[flintv4] developer mode: no usable local games/bedwars.lua -- using the published build')
     end
 
     for attempt = 1, 4 do
@@ -8128,62 +8123,22 @@ local function downloadBedwars()
     return nil
 end
 
--- LuaArmor blanks the global script_key as soon as it has authenticated -- an anti-key-theft
--- measure, so another script running later in the same session cannot read it back out. That
--- makes the key single-use per session, and ANY second load of the payload (the GUI's Reinject
--- button, a re-run of this file, a manual execute after injecting) lands on 'No key found',
--- which does not merely fail: LuaArmor puts up a modal Auth Error with a Leave button and never
--- returns. Everything downstream of the call below is then stranded -- including main.lua's
--- finishLoading(), which is what applies your saved profile, so the symptom is a GUI that loads
--- with Profile 'default' and an empty Profiles list rather than an obvious error.
---
--- shared.PistonwareKey is the loader's own copy of the validated key and is never blanked, so
--- re-publishing from it immediately before each load makes the key effectively reusable.
--- Written to every table the payload might read it from, not just one. Executors do not agree
--- on what a loadstring'd chunk's environment is: on most, a bare global assignment lands in
--- getgenv(), but several mobile executors sandbox chunks so that the two are different tables,
--- and _G is different again. Whichever one the payload looks at has to have the key in it, and
--- writing all three costs nothing. Returns false when there is no key to publish.
-local function republishKey()
-    local key = shared.PistonwareKey
-    if type(key) ~= 'string' or key == '' then return false end
-    script_key = key
-    pcall(function() getgenv().script_key = key end)
-    pcall(function() _G.script_key = key end)
-    return true
-end
-
 local bedwarsSource = downloadBedwars()
 if bedwarsSource then
     local bedwarsFn = loadstring(bedwarsSource)
     if bedwarsFn then
-        -- Refuse to run the payload with no key rather than let it discover that itself: a
-        -- LuaArmor auth failure is not a soft error, it puts up a modal and KICKS the player
-        -- out of the game. Saying so here costs them their combat modules for the round instead
-        -- of their session, and names the actual problem.
-        if not republishKey() then
-            warn('[pistonware] no key available to hand bedwars.lua -- skipping it rather than risk a kick. Re-run the pistonware loader.')
-            pcall(function()
-                vape:CreateNotification('Vape', 'Your key was not available when combat modules tried to load, so they were skipped. Re-run the pistonware loader to fix this.', 30, 'alert')
-            end)
-            return
-        end
         local ok, err = pcall(bedwarsFn)
         if not ok then
-            warn('[pistonware] bedwars.lua errored while running: '..tostring(err))
+            warn('[flintv4] bedwars.lua errored while running: '..tostring(err))
         end
     else
-        -- What came back does not compile. Nothing is cached now, so there is no stale file to
-        -- delete and no state to repair -- the next run fetches again from scratch. Almost
-        -- certainly the host served an error page that happened to pass the checks above.
-        warn('[pistonware] bedwars.lua did not compile -- the file host may be serving an error page')
+        warn('[flintv4] bedwars.lua did not compile -- the file host may be serving an error page')
         pcall(function()
             vape:CreateNotification('Vape', 'Combat modules could not be loaded (the file host returned something invalid). Rejoin the game to retry.', 30, 'alert')
         end)
     end
 else
-    -- Every attempt failed. Say so instead of silently loading without combat modules.
-    warn('[pistonware] bedwars.lua could not be downloaded -- the file host may be down')
+    warn('[flintv4] bedwars.lua could not be downloaded -- the file host may be down')
     pcall(function()
         vape:CreateNotification('Vape', 'Could not download bedwars.lua -- the file host may be down. Combat modules are unavailable; rejoin the game to retry.', 30, 'alert')
     end)

@@ -15,7 +15,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'..readfile('catsix/profiles/commit.txt')..'/'..select(1, path:gsub('catsix/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/'..'main'..'/'..select(1, path:gsub('flintv4/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -29,15 +29,15 @@ local function downloadFile(path, func)
 end
 
 vape.Place = 115875349872417
-if isfile('catsix/games/'..vape.Place..'.lua') then
-	loadstring(readfile('catsix/games/'..vape.Place..'.lua'), 'redliner')(...)
+if isfile('flintv4/games/'..vape.Place..'.lua') then
+	loadstring(readfile('flintv4/games/'..vape.Place..'.lua'), 'redliner')(...)
 else
 	if not shared.VapeDeveloper then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'..readfile('catsix/profiles/commit.txt')..'/games/'..vape.Place..'.lua', true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/'..'main'..'/games/'..vape.Place..'.lua', true)
 		end)
 		if suc and res ~= '404: Not Found' then
-			loadstring(downloadFile('catsix/games/'..vape.Place..'.lua'), 'redliner')(...)
+			loadstring(downloadFile('flintv4/games/'..vape.Place..'.lua'), 'redliner')(...)
 		end
 	end
 end
