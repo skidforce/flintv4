@@ -2017,3 +2017,223 @@ run(function()
 		Default = 3000
 	})
 end)
+
+run(function()
+	local Fullbright
+	local OldAmbient, OldBrightness
+
+	Fullbright = vape.Categories.Render:CreateModule({
+		Name = 'Fullbright',
+		Function = function(callback)
+			if callback then
+				OldAmbient = gameLighting.Ambient
+				OldBrightness = gameLighting.Brightness
+				gameLighting.Ambient = Color3.fromRGB(255, 255, 255)
+				gameLighting.Brightness = 3
+				gameLighting.GlobalShadows = false
+				gameLighting.ForceEndShadows = true
+
+				Fullbright:Clean(gameLighting.Changed:Connect(function(prop)
+					if prop == 'Ambient' then gameLighting.Ambient = Color3.fromRGB(255, 255, 255) end
+					if prop == 'Brightness' then gameLighting.Brightness = 3 end
+					if prop == 'GlobalShadows' then gameLighting.GlobalShadows = false end
+				end))
+			else
+				gameLighting.Ambient = OldAmbient or Color3.fromRGB(178, 178, 178)
+				gameLighting.Brightness = OldBrightness or 1
+				gameLighting.GlobalShadows = true
+				gameLighting.ForceEndShadows = false
+			end
+		end,
+		Tooltip = 'Max brightness, no shadows\nSee everything clearly'
+	})
+end)
+
+run(function()
+	local ColorCorrection
+	local Saturation
+	local Contrast
+	local Brightness
+	local Tint
+	local effect
+
+	ColorCorrection = vape.Categories.Render:CreateModule({
+		Name = 'ColorCorrection',
+		Function = function(callback)
+			if callback then
+				effect = Instance.new('ColorCorrectionEffect')
+				effect.Saturation = Saturation.Value
+				effect.Contrast = Contrast.Value
+				effect.Brightness = Brightness.Value
+				effect.TintColor = TintColor()
+				effect.Parent = gameLighting
+			else
+				if effect then effect:Destroy() effect = nil end
+			end
+		end,
+		Tooltip = 'Adjust screen colors'
+	})
+	Saturation = ColorCorrection:CreateSlider({
+		Name = 'Saturation',
+		Min = -1,
+		Max = 1,
+		Default = 0.3,
+		Decimal = 10,
+		Tooltip = '-1 = grayscale, 0 = normal, 1 = oversaturated'
+	})
+	Contrast = ColorCorrection:CreateSlider({
+		Name = 'Contrast',
+		Min = -1,
+		Max = 1,
+		Default = 0.1,
+		Decimal = 10
+	})
+	Brightness = ColorCorrection:CreateSlider({
+		Name = 'Brightness',
+		Min = -0.5,
+		Max = 0.5,
+		Default = 0,
+		Decimal = 10
+	})
+	local tintColor = Color3.fromRGB(255, 255, 255)
+	function TintColor()
+		return tintColor
+	end
+	ColorCorrection:CreateToggle({
+		Name = 'Warm tint',
+		Default = false,
+		Function = function(callback)
+			tintColor = callback and Color3.fromRGB(255, 230, 210) or Color3.fromRGB(255, 255, 255)
+			if effect then effect.TintColor = tintColor end
+		end,
+		Tooltip = 'Warm orange tint'
+	})
+	ColorCorrection:CreateToggle({
+		Name = 'Cold tint',
+		Default = false,
+		Function = function(callback)
+			tintColor = callback and Color3.fromRGB(210, 230, 255) or Color3.fromRGB(255, 255, 255)
+			if effect then effect.TintColor = tintColor end
+		end,
+		Tooltip = 'Cool blue tint'
+	})
+end)
+
+run(function()
+	local Bloom
+	local Intensity
+	local Size
+	local Threshold
+	local effect
+
+	Bloom = vape.Categories.Render:CreateModule({
+		Name = 'Bloom',
+		Function = function(callback)
+			if callback then
+				effect = Instance.new('BloomEffect')
+				effect.Intensity = Intensity.Value
+				effect.Size = Size.Value
+				effect.Threshold = Threshold.Value
+				effect.Parent = gameLighting
+			else
+				if effect then effect:Destroy() effect = nil end
+			end
+		end,
+		Tooltip = 'Glow around bright objects'
+	})
+	Intensity = Bloom:CreateSlider({
+		Name = 'Intensity',
+		Min = 0,
+		Max = 2,
+		Default = 0.8,
+		Decimal = 10
+	})
+	Size = Bloom:CreateSlider({
+		Name = 'Size',
+		Min = 0,
+		Max = 56,
+		Default = 24
+	})
+	Threshold = Bloom:CreateSlider({
+		Name = 'Threshold',
+		Min = 0,
+		Max = 2,
+		Default = 1,
+		Decimal = 10
+	})
+end)
+
+run(function()
+	local SunRays
+	local Intensity
+	local Spread
+	local effect
+
+	SunRays = vape.Categories.Render:CreateModule({
+		Name = 'SunRays',
+		Function = function(callback)
+			if callback then
+				effect = Instance.new('SunRaysEffect')
+				effect.Intensity = Intensity.Value
+				effect.Spread = Spread.Value
+				effect.Parent = gameLighting
+			else
+				if effect then effect:Destroy() effect = nil end
+			end
+		end,
+		Tooltip = 'Light rays from the sun'
+	})
+	Intensity = SunRays:CreateSlider({
+		Name = 'Intensity',
+		Min = 0,
+		Max = 1,
+		Default = 0.2,
+		Decimal = 10
+	})
+	Spread = SunRays:CreateSlider({
+		Name = 'Spread',
+		Min = 0,
+		Max = 1,
+		Default = 0.5,
+		Decimal = 10
+	})
+end)
+
+run(function()
+	local AmbientColor
+	local AmbientSky
+	local AmbientOutdoor
+	local effect
+
+	AmbientColor = vape.Categories.Render:CreateModule({
+		Name = 'AmbientColor',
+		Function = function(callback)
+			if callback then
+				effect = Instance.new('ColorCorrectionEffect')
+				effect.Saturation = 0
+				effect.Brightness = 0
+				effect.Contrast = 0
+				effect.TintColor = Color3.fromRGB(255, 255, 255)
+				effect.Parent = gameLighting
+
+				gameLighting.OutdoorAmbient = AmbientOutdoor.Value
+				gameLighting.Ambient = AmbientSky.Value
+			else
+				if effect then effect:Destroy() effect = nil end
+				gameLighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+				gameLighting.Ambient = Color3.fromRGB(178, 178, 178)
+			end
+		end,
+		Tooltip = 'Change ambient lighting colors'
+	})
+	AmbientSky = AmbientColor:CreateColorSlider({
+		Name = 'Sky ambient',
+		Default = Color3.fromRGB(100, 150, 255),
+		Tooltip = 'Color of shadows'
+	})
+	AmbientOutdoor = AmbientColor:CreateColorSlider({
+		Name = 'Outdoor ambient',
+		Default = Color3.fromRGB(200, 180, 255),
+		Tooltip = 'Color of outdoor lighting'
+	})
+end)
