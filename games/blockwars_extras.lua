@@ -387,7 +387,7 @@ run(function()
 	local BedToggle
 	local GeneratorToggle
 	local SelfBreak
-	local InfiniteRange
+	local origCF
 
 	local function getBlockAt(pos)
 		return blocks[pos // 3]
@@ -412,10 +412,19 @@ run(function()
 			local blockPos = v.Position
 			if not SelfBreak.Enabled and v:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
 
-			if Mode.Value == 'Teleport' then
-				-- silent: fire remote from current position, server sees legit position
+			if Mode.Value == 'Silent' then
 				breakBlockRemote(v)
 				task.wait(BreakSpeed.Value)
+			elseif Mode.Value == 'Teleport' then
+				if entitylib.isAlive then
+					local root = entitylib.character.RootPart
+					origCF = root.CFrame
+					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
+					task.wait(0.05)
+					breakBlockRemote(v)
+					task.wait(BreakSpeed.Value)
+					if origCF then root.CFrame = origCF end
+				end
 			else
 				if (blockPos - localPosition).Magnitude > Range.Value then continue end
 				breakBlockRemote(v)
@@ -432,9 +441,19 @@ run(function()
 			if not v or not v.Parent then continue end
 			local blockPos = v.Position
 
-			if Mode.Value == 'Teleport' then
+			if Mode.Value == 'Silent' then
 				mineBlockRemote(v)
 				task.wait(BreakSpeed.Value)
+			elseif Mode.Value == 'Teleport' then
+				if entitylib.isAlive then
+					local root = entitylib.character.RootPart
+					origCF = root.CFrame
+					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
+					task.wait(0.05)
+					mineBlockRemote(v)
+					task.wait(BreakSpeed.Value)
+					if origCF then root.CFrame = origCF end
+				end
 			else
 				if (blockPos - localPosition).Magnitude > Range.Value then continue end
 				mineBlockRemote(v)
@@ -465,15 +484,17 @@ run(function()
 						end
 					end
 				until not Breaker.Enabled
+			else
+				origCF = nil
 			end
 		end,
 		Tooltip = 'Breaks beds and generators\nSilent: fires remote from your position'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
-		List = {'Silent', 'Normal'},
+		List = {'Silent', 'Teleport', 'Normal'},
 		Default = 'Silent',
-		Tooltip = 'Silent: fire break remote from your position\nNormal: break within range'
+		Tooltip = 'Silent: fire remote from your position\nTeleport: TP to target, break, TP back\nNormal: break within range'
 	})
 	Range = Breaker:CreateSlider({
 		Name = 'Break range',
