@@ -258,4 +258,27 @@ function module.SolveTrajectory(origin, projectileSpeed, gravity, targetPos, tar
 	end
 end
 
+local observed = {}
+module.Observed = observed
+
+function module.Observe(rootPart, position, velocity, inAir, gravity, localPlayerPos, hipHeight, jumpVelocity)
+	if not rootPart then return end
+	local id = rootPart:GetFullName()
+	observed[id] = {
+		Position = position,
+		Velocity = velocity,
+		InAir = inAir,
+		Gravity = gravity,
+		LocalPlayerPos = localPlayerPos,
+		HipHeight = hipHeight,
+		JumpVelocity = jumpVelocity,
+		Timestamp = tick()
+	}
+end
+
+function module.GetObserved(rootPart)
+	if not rootPart then return nil end
+	return observed[rootPart:GetFullName()]
+end
+
 return module

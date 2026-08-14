@@ -12999,7 +12999,7 @@ run(function()
 	end
 	
 	local function updateAttackControls()
-		if Legit then
+		if Legit and Legit.Object and AutoAttack and Range and Range.Object and AttackDelay and AttackDelay.Object and Targets and Targets.Object and Sort and Sort.Object then
 			local enabled = AutoAttack.Enabled
 			Legit.Object.Visible = enabled
 			Range.Object.Visible = enabled and not Legit.Enabled
@@ -19336,7 +19336,10 @@ do
 	end
 
 	if bedwarssource and bedwarssource:gsub('%s', '') ~= '' then
-		local ok, err = pcall(loadstring, bedwarssource)
+		local ok, err = pcall(function()
+			local fn = loadstring(bedwarssource)
+			if fn then fn() end
+		end)
 		if not ok then
 			warn('[flintv4] failed to load bedwars modules: '..tostring(err))
 		end
