@@ -999,10 +999,7 @@ run(function()
 	local WallCheck
 	local Expand
 	local PlaceDelay
-	local NoFallToggle
 	local up, down = 0, 0
-	local groundHit
-	local trackedFall = 0
 
 	local adjacent = {}
 	for x = -3, 3, 3 do
@@ -1087,8 +1084,6 @@ run(function()
 		Name = 'BlockFly',
 		Function = function(callback)
 			if callback then
-				pcall(function() groundHit = bedwars.Handler:Get('GroundHit') end)
-				trackedFall = 0
 				BlockFly:Clean(inputService.InputBegan:Connect(function(input)
 					if not inputService:GetFocusedTextBox() then
 						if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
@@ -1104,30 +1099,6 @@ run(function()
 					elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL2 then
 						down = 0
 					end
-				end))
-
-				BlockFly:Clean(runService.PostSimulation:Connect(function()
-					if not NoFallToggle.Enabled then return end
-					if not entitylib.isAlive then return end
-					if not groundHit then return end
-					local root = entitylib.character.RootPart
-					if trackedFall < -45 then
-						local pos = root.Position
-						local params = RaycastParams.new()
-						params.FilterDescendantsInstances = {lplr.Character, gameCamera}
-						params.RespectCanCollide = true
-						local ray = workspace:Raycast(pos, Vector3.new(0, -50, 0), params)
-						if ray then
-							local groundY = math.round(ray.Position.Y / 3) * 3
-							local groundPos = Vector3.new(math.round(pos.X / 3) * 3, groundY + 3, math.round(pos.Z / 3) * 3)
-							root.CFrame = CFrame.new(groundPos) * (root.CFrame - root.CFrame.Position)
-						end
-						root.AssemblyLinearVelocity = Vector3.new(0, 2.5, 0)
-						entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-						runService.PreRender:Wait()
-						groundHit:Fire('SendToServer', nil, Vector3.new(0, trackedFall, 0), workspace:GetServerTimeNow())
-					end
-					trackedFall = root.AssemblyLinearVelocity.Y
 				end))
 
 				repeat
@@ -1161,9 +1132,8 @@ run(function()
 					end
 					task.wait(PlaceDelay.Value)
 				until not BlockFly.Enabled
-			else
-				up, down = 0, 0
-				trackedFall = 0
+		else
+			up, down = 0, 0
 			end
 		end,
 		Tooltip = 'Fly while placing blocks below you\nlike scaffold but in the air'
@@ -1197,11 +1167,6 @@ run(function()
 		Name = 'Wall Check',
 		Default = true
 	})
-	NoFallToggle = BlockFly:CreateToggle({
-		Name = 'NoFall',
-		Default = true,
-		Tooltip = 'Sends fake ground hit to prevent fall damage'
-	})
 	PlaceDelay = BlockFly:CreateSlider({
 		Name = 'Place interval',
 		Min = 0,
@@ -1209,6 +1174,53 @@ run(function()
 		Default = 0.03,
 		Decimal = 1000,
 		Suffix = 'sec'
+	})
+end)
+
+run(function()
+	local NoFall
+	local GroundSnap
+
+	NoFall = vape.Categories.Blatant:CreateModule({
+		Name = 'NoFall',
+		Function = function(callback)
+			if callback then
+				local groundHit = bedwars.Handler:Get('GroundHit')
+				local tracked = 0
+
+				NoFall:Clean(runService.PostSimulation:Connect(function()
+					if entitylib.isAlive and store.matchState == 1 then
+						local root = entitylib.character.RootPart
+						local velo = root.AssemblyLinearVelocity
+						if tracked < -45 then
+							if GroundSnap.Enabled then
+								local pos = root.Position
+								local params = RaycastParams.new()
+								params.FilterDescendantsInstances = {lplr.Character, gameCamera}
+								params.RespectCanCollide = true
+								local ray = workspace:Raycast(pos, Vector3.new(0, -50, 0), params)
+								if ray then
+									local groundY = math.round(ray.Position.Y / 3) * 3
+									local groundPos = Vector3.new(math.round(pos.X / 3) * 3, groundY + 3, math.round(pos.Z / 3) * 3)
+									root.CFrame = CFrame.new(groundPos) * (root.CFrame - root.CFrame.Position)
+								end
+							end
+							root.AssemblyLinearVelocity = Vector3.new(0, 2.5, 0)
+							entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+							runService.PreRender:Wait()
+							groundHit:Fire('SendToServer', nil, Vector3.new(0, tracked, 0), workspace:GetServerTimeNow())
+						end
+						tracked = velo.Y
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Prevents fall damage.\nGround Snap teleports to the block below.'
+	})
+	GroundSnap = NoFall:CreateToggle({
+		Name = 'Ground Snap',
+		Default = true,
+		Tooltip = 'Teleports to the block below before firing\nGroundHit to better bypass anti-cheat'
 	})
 end)
 
