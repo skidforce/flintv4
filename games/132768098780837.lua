@@ -303,6 +303,7 @@ local Fly
 run(function()
 	local Value
 	local Keys
+	local Mode
 	local Platform = Instance.new('Part')
 	Platform.CanQuery = false
 	Platform.Anchored = true
@@ -310,26 +311,111 @@ run(function()
 	Platform.Transparency = 1
 	Platform.Parent = nil
 
+	local up, down = 0, 0
+	local lookFly = false
+
 	Fly = vape.Categories.Blatant:CreateModule({
 		Name = 'Fly',
 		Function = function(callback)
-			if Platform then
-				Platform.Parent = callback and gameCamera or nil
-			end
-
 			if callback then
 				if not AnticheatBypass.Enabled then
 					AnticheatBypass:Toggle()
 				end
 
-				Fly:Clean(runService.PreSimulation:Connect(function(dt)
-					if entitylib.isAlive then
-						applySpeed(Value.Value, dt)
-						Platform.CFrame = down ~= 0 and CFrame.identity or entitylib.character.RootPart.CFrame + Vector3.new(0, -(entitylib.character.HipHeight + 0.5), 0)
-					end
-				end))
+				local mode = Mode.Value
 
-				up, down = 0, 0
+				if mode == 'Platform' then
+					Platform.Parent = gameCamera
+
+					Fly:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive then
+							applySpeed(Value.Value, dt)
+							Platform.CFrame = down ~= 0 and CFrame.identity or entitylib.character.RootPart.CFrame + Vector3.new(0, -(entitylib.character.HipHeight + 0.5), 0)
+						end
+					end))
+
+				elseif mode == 'Velocity' then
+					Fly:Clean(runService.Heartbeat:Connect(function(dt)
+						if entitylib.isAlive then
+							local root = entitylib.character.RootPart
+							local hum = entitylib.character.Humanoid
+							local moveDir = hum.MoveDirection
+							local velo = root.AssemblyLinearVelocity
+
+							local horizontal = moveDir * Value.Value
+							local vertical = (up - down) * Value.Value * 0.8
+
+							root.AssemblyLinearVelocity = Vector3.new(horizontal.X, vertical, horizontal.Z)
+							root.AssemblyLinearVelocity = Vector3.new(velo.X, vertical, velo.Z)
+						end
+					end))
+
+				elseif mode == 'CFrame' then
+					Fly:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive then
+							local root = entitylib.character.RootPart
+							local hum = entitylib.character.Humanoid
+							local moveDir = hum.MoveDirection
+							local camCF = gameCamera.CFrame
+
+							local move = Vector3.zero
+							if moveDir.Magnitude > 0 then
+								move = (camCF * CFrame.new(moveDir)).Position - camCF.Position
+								move = move.Unit * Value.Value * dt
+							end
+
+							local vertical = (up - down) * Value.Value * dt
+
+							root.CFrame = root.CFrame + move + Vector3.new(0, vertical, 0)
+							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						end
+					end))
+
+				elseif mode == 'Look' then
+					lookFly = true
+					Fly:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive then
+							local root = entitylib.character.RootPart
+							local camCF = gameCamera.CFrame
+							local move = camCF.LookVector * Value.Value * dt
+
+							if not inputService:IsKeyDown(Enum.KeyCode.W) then
+								move = Vector3.zero
+							end
+
+							local vertical = (up - down) * Value.Value * dt
+
+							root.CFrame = root.CFrame + move + Vector3.new(0, vertical, 0)
+							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						end
+					end))
+
+				elseif mode == 'Hover' then
+					local hoverY = nil
+					Fly:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive then
+							local root = entitylib.character.RootPart
+							local hum = entitylib.character.Humanoid
+							local moveDir = hum.MoveDirection
+
+							if not hoverY then
+								hoverY = root.Position.Y
+							end
+
+							hoverY = hoverY + (up - down) * Value.Value * dt * 0.3
+
+							if moveDir.Magnitude > 0 then
+								local horiz = moveDir * Value.Value * dt
+								root.CFrame = root.CFrame + horiz
+							end
+
+							root.CFrame = CFrame.new(root.CFrame.Position.X, hoverY, root.CFrame.Position.Z) * (root.CFrame - root.CFrame.Position)
+							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						end
+					end))
+				end
+
+				-- keybinds for up/down
 				for _, v in {'InputBegan', 'InputEnded'} do
 					Fly:Clean(inputService[v]:Connect(function(input)
 						if not inputService:GetFocusedTextBox() then
@@ -351,12 +437,22 @@ run(function()
 						end))
 					end)
 				end
+			else
+				Platform.Parent = nil
+				up, down = 0, 0
+				lookFly = false
 			end
 		end,
 		ExtraText = function()
-			return 'BlockWars'
+			return Mode.Value
 		end,
-		Tooltip = 'Makes you go zoom.'
+		Tooltip = 'Multiple fly modes\nPlatform: AC bypass platform\nVelocity: direct velocity control\nCFrame: smooth teleport\nLook: fly where camera faces\nHover: stay at height'
+	})
+	Mode = Fly:CreateDropdown({
+		Name = 'Mode',
+		List = {'Platform', 'Velocity', 'CFrame', 'Look', 'Hover'},
+		Default = 'Platform',
+		Tooltip = 'Platform: uses AC bypass\nVelocity: direct velocity\nCFrame: teleport movement\nLook: fly where you look\nHover: maintain height'
 	})
 	Keys = Fly:CreateDropdown({
 		Name = 'Keys',
