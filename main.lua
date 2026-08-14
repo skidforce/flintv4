@@ -334,6 +334,12 @@ end
 	end
 	destroyDownloader()
 	vape = loadstring(downloadFile('flintv4/guis/'..gui..'.lua'), 'gui')()
+	if not vape then
+		warn('[flintv4] GUI theme "'..gui..'" failed to load, falling back to new')
+		gui = 'new'
+		writefile('flintv4/profiles/gui.txt', 'new')
+		vape = loadstring(downloadFile('flintv4/guis/new.lua'), 'gui')()
+	end
 	shared.vape = vape
 
 if not shared.VapeIndependent then
