@@ -371,40 +371,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
-	})
-end)
-				end
-			else
-				Platform.Parent = nil
-				up, down = 0, 0
-				lookFly = false
-			end
-		end,
-		ExtraText = function()
-			return Mode.Value
-		end,
-		Tooltip = 'Multiple fly modes\nPlatform: AC bypass platform\nVelocity: direct velocity control\nCFrame: smooth teleport\nLook: fly where camera faces\nHover: stay at height'
-	})
-	Mode = Fly:CreateDropdown({
-		Name = 'Mode',
-		List = {'Platform', 'Velocity', 'CFrame', 'Look', 'Hover'},
-		Default = 'Platform',
-		Tooltip = 'Platform: uses AC bypass\nVelocity: direct velocity\nCFrame: teleport movement\nLook: fly where you look\nHover: maintain height'
-	})
-	Keys = Fly:CreateDropdown({
-		Name = 'Keys',
-		List = {'Space/LeftControl', 'Space/LeftShift', 'E/Q', 'Space/Q', 'ButtonA/ButtonL2'},
-		Tooltip = 'The key combination for going up & down'
-	})
-	Value = Fly:CreateSlider({
-		Name = 'Speed',
-		Min = 1,
-		Max = 300,
-		Default = 100,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end
-	})
+})
 end)
 
 run(function()
