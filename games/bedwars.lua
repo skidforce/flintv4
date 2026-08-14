@@ -1134,7 +1134,13 @@ run(function()
 				until not BlockFly.Enabled
 		else
 			up, down = 0, 0
+			if entitylib.isAlive then
+				local root = entitylib.character.RootPart
+				if root then
+					root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				end
 			end
+		end
 		end,
 		Tooltip = 'Fly while placing blocks below you\nlike scaffold but in the air'
 	})
