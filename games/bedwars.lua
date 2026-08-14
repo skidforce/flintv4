@@ -18,6 +18,7 @@ local inputService = cloneref(game:GetService('UserInputService'))
 local tweenService = cloneref(game:GetService('TweenService'))
 local collectionService = cloneref(game:GetService('CollectionService'))
 local gameCamera = workspace.CurrentCamera
+local gameLighting = game:GetService('Lighting')
 local lplr = game.Players.LocalPlayer
 local canSwing = getgenv().canSwing
 local collection = getgenv().collection
@@ -998,13 +999,15 @@ run(function()
 	})
 end)
 
-run(function()
+	run(function()
 	local BlockFly
 	local Speed
 	local VerticalSpeed
 	local WallCheck
 	local Expand
 	local PlaceDelay
+	local PauseInterval
+	local PauseDuration
 	local up, down = 0, 0
 	local origWalkSpeed = 16
 
@@ -1092,6 +1095,8 @@ run(function()
 		Function = function(callback)
 			if callback then
 				origWalkSpeed = entitylib.isAlive and entitylib.character.Humanoid.WalkSpeed or 16
+				local lastPause = tick()
+				local pausing = false
 				BlockFly:Clean(inputService.InputBegan:Connect(function(input)
 					if not inputService:GetFocusedTextBox() then
 						if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
@@ -1110,7 +1115,23 @@ run(function()
 				end))
 
 				repeat
-					if entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
+					-- periodic pause: stop briefly then continue
+					if PauseInterval.Value > 0 and tick() - lastPause >= PauseInterval.Value then
+						pausing = true
+						if entitylib.isAlive then
+							local hum = entitylib.character.Humanoid
+							if hum then hum.WalkSpeed = 0 end
+						end
+						task.wait(PauseDuration.Value)
+						if entitylib.isAlive then
+							local hum = entitylib.character.Humanoid
+							if hum then hum.WalkSpeed = math.max(Speed.Value, 16) end
+						end
+						lastPause = tick()
+						pausing = false
+					end
+
+					if not pausing and entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
 						local root = entitylib.character.RootPart
 						local hum = entitylib.character.Humanoid
 						local moveDir = hum.MoveDirection
@@ -1201,6 +1222,24 @@ run(function()
 		Default = 0.03,
 		Decimal = 1000,
 		Suffix = 'sec'
+	})
+	PauseInterval = BlockFly:CreateSlider({
+		Name = 'Pause interval',
+		Min = 0,
+		Max = 10,
+		Default = 3,
+		Decimal = 10,
+		Suffix = 'sec',
+		Tooltip = 'How often to pause briefly (0 = never)'
+	})
+	PauseDuration = BlockFly:CreateSlider({
+		Name = 'Pause duration',
+		Min = 0.1,
+		Max = 1,
+		Default = 0.3,
+		Decimal = 10,
+		Suffix = 'sec',
+		Tooltip = 'How long to stop each pause'
 	})
 end)
 
@@ -1784,5 +1823,197 @@ run(function()
 			end
 		end,
 		Tooltip = 'Run animation continuously\ninstead of per-swing'
+	})
+end)
+
+run(function()
+	local HitSound
+	local SoundList
+	local Volume
+	local Pitch
+
+	local sounds = {
+		'rbxassetid://14736249347',
+		'rbxassetid://8200754399',
+		'rbxassetid://6993372814',
+		'rbxassetid://279227693',
+		'rbxassetid://279229192',
+		'rbxassetid://287112271',
+		'rbxassetid://388723916',
+		'rbxassetid://388726667',
+		'rbxassetid://405194080',
+		'rbxassetid://481088553',
+		'rbxassetid://484200742',
+		'rbxassetid://83690472549256',
+		'rbxassetid://107176344504758',
+		'rbxassetid://111090572475133',
+		'rbxassetid://113267949064300',
+		'rbxassetid://131326339350805',
+	}
+
+	local function getSound()
+		local val = SoundList.Value
+		if val ~= '' and val:find('rbxassetid') then
+			return val
+		end
+		return sounds[math.random(1, #sounds)]
+	end
+
+	HitSound = vape.Categories.Render:CreateModule({
+		Name = 'HitSound',
+		Function = function(callback)
+			if callback then
+				HitSound:Clean(vapeEvents.EntityDamageEvent:Connect(function()
+					local sound = Instance.new('Sound')
+					sound.SoundId = getSound()
+					sound.Volume = Volume.Value
+					sound.PlaybackSpeed = Pitch.Value
+					sound.Parent = gameCamera
+					sound.Ended:Connect(function() sound:Destroy() end)
+					sound:Play()
+				end))
+			end
+		end,
+		Tooltip = 'Plays a sound when you hit an enemy'
+	})
+	SoundList = HitSound:CreateTextBox({
+		Name = 'Sound ID',
+		Default = '',
+		Placeholder = 'rbxassetid://... (blank = random)',
+		Tooltip = 'Enter a Roblox sound ID\nLeave blank for random from preset list'
+	})
+	Volume = HitSound:CreateSlider({
+		Name = 'Volume',
+		Min = 0,
+		Max = 2,
+		Default = 1,
+		Decimal = 10
+	})
+	Pitch = HitSound:CreateSlider({
+		Name = 'Pitch',
+		Min = 0.5,
+		Max = 2,
+		Default = 1,
+		Decimal = 10
+	})
+end)
+
+run(function()
+	local CustomSky
+	local SkyboxTop
+	local SkyboxBottom
+	local SkyboxLeft
+	local SkyboxRight
+	local SkyboxFront
+	local SkyboxBack
+	local SunTex
+	local MoonTex
+	local StarCount
+	local skyObj, sunObj, moonObj, starObj
+
+	local defaultSky = {
+		SkyboxBk = 'rbxassetid://6444884337',
+		SkyboxDn = 'rbxassetid://6444884785',
+		SkyboxFt = 'rbxassetid://6444884337',
+		SkyboxLf = 'rbxassetid://6444884337',
+		SkyboxRt = 'rbxassetid://6444884337',
+		SkyboxUp = 'rbxassetid://6444884785',
+		SunAngularSize = 11,
+		MoonAngularSize = 11,
+		StarCount = 3000,
+	}
+
+	local function removeOld()
+		if skyObj then pcall(function() skyObj:Destroy() end) skyObj = nil end
+		if sunObj then pcall(function() sunObj:Destroy() end) sunObj = nil end
+		if moonObj then pcall(function() moonObj:Destroy() end) moonObj = nil end
+		if starObj then pcall(function() starObj:Destroy() end) starObj = nil end
+	end
+
+	local function applySky()
+		removeOld()
+		if not CustomSky.Enabled then return end
+
+		skyObj = Instance.new('Sky')
+		skyObj.SkyboxBk = SkyboxBack.Value ~= '' and SkyboxBack.Value or defaultSky.SkyboxBk
+		skyObj.SkyboxDn = SkyboxBottom.Value ~= '' and SkyboxBottom.Value or defaultSky.SkyboxDn
+		skyObj.SkyboxFt = SkyboxFront.Value ~= '' and SkyboxFront.Value or defaultSky.SkyboxFt
+		skyObj.SkyboxLf = SkyboxLeft.Value ~= '' and SkyboxLeft.Value or defaultSky.SkyboxLf
+		skyObj.SkyboxRt = SkyboxRight.Value ~= '' and SkyboxRight.Value or defaultSky.SkyboxRt
+		skyObj.SkyboxUp = SkyboxTop.Value ~= '' and SkyboxTop.Value or defaultSky.SkyboxUp
+		skyObj.StarCount = StarCount.Value
+		skyObj.Parent = gameLighting
+
+		if SunTex.Value ~= '' then
+			sunObj = Instance.new('Sky')
+			sunObj.SunTextureId = SunTex.Value
+			sunObj.SunAngularSize = 21
+			sunObj.Parent = gameLighting
+		end
+
+		if MoonTex.Value ~= '' then
+			moonObj = Instance.new('Sky')
+			moonObj.MoonTextureId = MoonTex.Value
+			moonObj.MoonAngularSize = 21
+			moonObj.Parent = gameLighting
+		end
+	end
+
+	CustomSky = vape.Categories.Render:CreateModule({
+		Name = 'CustomSky',
+		Function = function(callback)
+			if callback then
+				applySky()
+			else
+				removeOld()
+			end
+		end,
+		Tooltip = 'Replaces the skybox with custom textures'
+	})
+	SkyboxTop = CustomSky:CreateTextBox({
+		Name = 'Top',
+		Default = '',
+		Placeholder = 'SkyboxUp texture ID'
+	})
+	SkyboxBottom = CustomSky:CreateTextBox({
+		Name = 'Bottom',
+		Default = '',
+		Placeholder = 'SkyboxDn texture ID'
+	})
+	SkyboxLeft = CustomSky:CreateTextBox({
+		Name = 'Left',
+		Default = '',
+		Placeholder = 'SkyboxLf texture ID'
+	})
+	SkyboxRight = CustomSky:CreateTextBox({
+		Name = 'Right',
+		Default = '',
+		Placeholder = 'SkyboxRt texture ID'
+	})
+	SkyboxFront = CustomSky:CreateTextBox({
+		Name = 'Front',
+		Default = '',
+		Placeholder = 'SkyboxFt texture ID'
+	})
+	SkyboxBack = CustomSky:CreateTextBox({
+		Name = 'Back',
+		Default = '',
+		Placeholder = 'SkyboxBk texture ID'
+	})
+	SunTex = CustomSky:CreateTextBox({
+		Name = 'Sun texture',
+		Default = '',
+		Placeholder = 'Sun texture ID (blank = default)'
+	})
+	MoonTex = CustomSky:CreateTextBox({
+		Name = 'Moon texture',
+		Default = '',
+		Placeholder = 'Moon texture ID (blank = default)'
+	})
+	StarCount = CustomSky:CreateSlider({
+		Name = 'Star count',
+		Min = 0,
+		Max = 5000,
+		Default = 3000
 	})
 end)
