@@ -7038,7 +7038,7 @@ run(function()
 						table.insert(skinsForFamily, label)
 					end
 					if #skinsForFamily > 0 then
-						option:Set(skinsForFamily[math.random(1, #skinsForFamily)])
+						option:SetValue(skinsForFamily[math.random(1, #skinsForFamily)])
 					end
 				end
 			end
