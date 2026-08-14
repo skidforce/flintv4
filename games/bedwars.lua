@@ -1,5 +1,5 @@
 -- FlintV4 BedWars combat modules
--- Loaded by 6872274481.lua via loadstring — must grab everything from globals/shared.
+-- Loaded by 6872274481.lua via loadstring � must grab everything from globals/shared.
 
 local run = function(func)
 	local ok, err = pcall(func)
@@ -999,53 +999,96 @@ run(function()
 	local WallCheck
 	local Expand
 	local PlaceDelay
+	local NoFallToggle
 	local up, down = 0, 0
+	local groundHit
+	local trackedFall = 0
 
-	local function getBlockBelow(root, expand)
-		local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-		local moveDir = entitylib.character.Humanoid.MoveDirection
-		local blockPos = Vector3.new(
-			math.floor((pos.X + moveDir.X * expand * 3) / 3 + 0.5) * 3,
-			math.floor(pos.Y / 3 + 0.5) * 3,
-			math.floor((pos.Z + moveDir.Z * expand * 3) / 3 + 0.5) * 3
-		)
-		return blockPos
+	local adjacent = {}
+	for x = -3, 3, 3 do
+		for y = -3, 3, 3 do
+			for z = -3, 3, 3 do
+				local vec = Vector3.new(x, y, z)
+				if vec ~= Vector3.zero then
+					table.insert(adjacent, vec)
+				end
+			end
+		end
 	end
 
-	local function canPlaceAt(pos)
-		local existing = bedwars.BlockController:getStore():getBlockAt(pos)
-		if existing then return false end
-		local sides = {
-			Vector3.FromNormalId(Enum.NormalId.Top),
-			Vector3.FromNormalId(Enum.NormalId.Bottom),
-			Vector3.FromNormalId(Enum.NormalId.Left),
-			Vector3.FromNormalId(Enum.NormalId.Right),
-			Vector3.FromNormalId(Enum.NormalId.Front),
-			Vector3.FromNormalId(Enum.NormalId.Back),
-		}
-		for _, side in sides do
-			local adj = bedwars.BlockController:getStore():getBlockAt(pos + side * 3)
-			if adj then return true end
+	local function roundPos(vec)
+		return Vector3.new(math.round(vec.X / 3) * 3, math.round(vec.Y / 3) * 3, math.round(vec.Z / 3) * 3)
+	end
+
+	local function getPlacedBlock(pos)
+		if not pos then return end
+		local roundedPosition = bedwars.BlockController:getBlockPosition(pos)
+		return bedwars.BlockController:getStore():getBlockAt(roundedPosition), roundedPosition
+	end
+
+	local function checkAdjacent(pos)
+		for _, v in adjacent do
+			if getPlacedBlock(pos + v) then
+				return true
+			end
 		end
 		return false
 	end
 
-	local function getBlockItem()
+	local function blockProximity(pos)
+		local mag, returned = 60
+		for x = -21, 21, 3 do
+			for y = -21, 21, 3 do
+				for z = -21, 21, 3 do
+					local v = pos + Vector3.new(x, y, z)
+					local block = getPlacedBlock(v)
+					if block then
+						local blockpos = roundPos(v)
+						local startpos = blockpos - Vector3.new(3, 3, 3)
+						local endpos = blockpos + Vector3.new(3, 3, 3)
+						local check = blockpos + (pos - blockpos).Unit * 100
+						local near = Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
+						local newmag = (pos - near).Magnitude
+						if newmag < mag then
+							mag, returned = newmag, near
+						end
+					end
+				end
+			end
+		end
+		return returned
+	end
+
+	local function getScaffoldBlock()
 		if store.hand.toolType == 'block' and store.hand.tool then
 			return store.hand.tool.Name
 		end
 		for _, item in store.inventory.inventory.items do
-			if bedwars.ItemMeta[item.itemType].block then
+			if bedwars.ItemMeta[item.itemType] and bedwars.ItemMeta[item.itemType].block then
 				return item.itemType
 			end
 		end
 		return nil
 	end
 
+	local function placeBlockSmart(pos)
+		local wool = getScaffoldBlock()
+		if not wool then return end
+		local block, blockpos = getPlacedBlock(pos)
+		if not block then
+			local placePos = checkAdjacent(pos) and pos or blockProximity(pos)
+			if placePos then
+				bedwars.placeBlock(placePos, wool)
+			end
+		end
+	end
+
 	BlockFly = vape.Categories.Blatant:CreateModule({
 		Name = 'BlockFly',
 		Function = function(callback)
 			if callback then
+				pcall(function() groundHit = bedwars.Handler:Get('GroundHit') end)
+				trackedFall = 0
 				BlockFly:Clean(inputService.InputBegan:Connect(function(input)
 					if not inputService:GetFocusedTextBox() then
 						if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
@@ -1063,20 +1106,28 @@ run(function()
 					end
 				end))
 
+				BlockFly:Clean(runService.PostSimulation:Connect(function()
+					if not NoFallToggle.Enabled then return end
+					if not entitylib.isAlive then return end
+					if not groundHit then return end
+					local root = entitylib.character.RootPart
+					if trackedFall < -45 then
+						root.Velocity = Vector3.new(0, 2.5, 0)
+						entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+						runService.PreRender:Wait()
+						groundHit:Fire('SendToServer', nil, Vector3.new(0, trackedFall, 0), workspace:GetServerTimeNow())
+					end
+					trackedFall = root.Velocity.Y
+				end))
+
 				repeat
 					if entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
 						local root = entitylib.character.RootPart
 						local moveDir = entitylib.character.Humanoid.MoveDirection
-						local dt = 1 / 60
-						local wool = getBlockItem()
 
-						if wool then
-							for i = 1, Expand.Value do
-								local blockPos = getBlockBelow(root, i)
-								if canPlaceAt(blockPos) then
-									pcall(bedwars.placeBlock, blockPos, wool)
-								end
-							end
+						for i = Expand.Value, 1, -1 do
+							local blockPos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0) + moveDir * (i * 3))
+							pcall(placeBlockSmart, blockPos)
 						end
 
 						local verticalVelo = (up + down) * VerticalValue.Value
@@ -1085,7 +1136,7 @@ run(function()
 						rayParams.RespectCanCollide = true
 
 						if moveDir.Magnitude > 0 then
-							local dest = moveDir * math.max(Value.Value, 0) * dt
+							local dest = moveDir * math.max(Value.Value, 0) * (1 / 60)
 							if WallCheck.Enabled then
 								local ray = workspace:Raycast(root.Position, dest, rayParams)
 								if ray then
@@ -1095,13 +1146,14 @@ run(function()
 							root.CFrame += dest
 						end
 
-						root.CFrame += Vector3.new(0, verticalVelo * dt, 0)
+						root.CFrame += Vector3.new(0, verticalVelo * (1 / 60), 0)
 						root.AssemblyLinearVelocity = Vector3.new(moveDir.X * math.max(Value.Value, 0), verticalVelo, moveDir.Z * math.max(Value.Value, 0))
 					end
 					task.wait(PlaceDelay.Value)
 				until not BlockFly.Enabled
 			else
 				up, down = 0, 0
+				trackedFall = 0
 			end
 		end,
 		Tooltip = 'Fly while placing blocks below you\nlike scaffold but in the air'
@@ -1134,6 +1186,11 @@ run(function()
 	WallCheck = BlockFly:CreateToggle({
 		Name = 'Wall Check',
 		Default = true
+	})
+	NoFallToggle = BlockFly:CreateToggle({
+		Name = 'NoFall',
+		Default = true,
+		Tooltip = 'Sends fake ground hit to prevent fall damage'
 	})
 	PlaceDelay = BlockFly:CreateSlider({
 		Name = 'Place interval',
@@ -1627,15 +1684,9 @@ run(function()
 			if callback then
 				oldSwing = bedwars.SwordController.swingSwordAtMouse
 				bedwars.SwordController.swingSwordAtMouse = function(self, ...)
-					local result = oldSwing(self, ...)
-					if not OnlyOnAttack.Enabled then
-						stopAnimation()
-						playAnimation(AnimStyle.Value, AnimSpeed.Value, AnimIntensity.Value)
-					end
-					return result
-				end
-				if OnlyOnAttack.Enabled then
-					connections[#connections + 1] = bedwars.SwordController.swingSwordAtMouse
+					stopAnimation()
+					playAnimation(AnimStyle.Value, AnimSpeed.Value, AnimIntensity.Value)
+					return oldSwing(self, ...)
 				end
 			else
 				if oldSwing then
@@ -1643,8 +1694,6 @@ run(function()
 					oldSwing = nil
 				end
 				stopAnimation()
-				for _, c in connections do pcall(function() end) end
-				table.clear(connections)
 			end
 		end,
 		Tooltip = 'Custom viewmodel sword animations\nwith 7 different styles'
