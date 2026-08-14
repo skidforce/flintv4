@@ -24,6 +24,11 @@ local collection = getgenv().collection
 local sortmethods = getgenv().sortmethods
 local playersService = cloneref(game:GetService('Players'))
 local runService = cloneref(game:GetService('RunService'))
+local httpService = cloneref(game:GetService('HttpService'))
+local prediction = vape.Libraries.prediction
+local switchItem = getgenv().switchItem
+local getPlacedBlock = getgenv().getPlacedBlock
+local getBow = getgenv().getBow
 
 run(function()
 	local Killaura
@@ -1363,16 +1368,18 @@ run(function()
 												shootPos, projSpeed, gravity,
 												targetPos,
 												target.RootPart.Velocity,
-												workspace.Gravity, 0,
-												target.Humanoid.FloorMaterial == Enum.Material.Air and 42.6 or nil,
-												nil, true, selfpos, entitylib.character.RootPart, nil, true
+												workspace.Gravity, target.HipHeight,
+												target.Jumping and 42.6 or nil,
+												nil, target.Humanoid.FloorMaterial == Enum.Material.Air or math.abs(target.RootPart.Velocity.Y) > 0.01,
+												target.RootPart.Position, target.RootPart, nil, true
 											)
 
 											if calc then
 												local lookDir = (calc - shootPos).Unit
 												local shootCF = CFrame.lookAlong(shootPos, lookDir)
 												pcall(function()
-													bedwars.ProjectileController:fireRelease(
+													local projRemote = bedwars.Handler:Get('ProjectileFire').Remote.instance
+													projRemote:InvokeServer(
 														tool, projType, projType,
 														shootCF.Position, calc,
 														lookDir * projSpeed,
