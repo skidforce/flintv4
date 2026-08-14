@@ -920,4 +920,157 @@ run(function()
 	})
 end)
 
+run(function()
+	local BlockFly
+	local Value
+	local VerticalValue
+	local WallCheck
+	local Expand
+	local PlaceDelay
+	local up, down = 0, 0
+
+	local function getBlockBelow(root, expand)
+		local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+		local moveDir = entitylib.character.Humanoid.MoveDirection
+		local blockPos = Vector3.new(
+			math.floor((pos.X + moveDir.X * expand * 3) / 3 + 0.5) * 3,
+			math.floor(pos.Y / 3 + 0.5) * 3,
+			math.floor((pos.Z + moveDir.Z * expand * 3) / 3 + 0.5) * 3
+		)
+		return blockPos
+	end
+
+	local function canPlaceAt(pos)
+		local existing = bedwars.BlockController:getStore():getBlockAt(pos)
+		if existing then return false end
+		local sides = {
+			Vector3.FromNormalId(Enum.NormalId.Top),
+			Vector3.FromNormalId(Enum.NormalId.Bottom),
+			Vector3.FromNormalId(Enum.NormalId.Left),
+			Vector3.FromNormalId(Enum.NormalId.Right),
+			Vector3.FromNormalId(Enum.NormalId.Front),
+			Vector3.FromNormalId(Enum.NormalId.Back),
+		}
+		for _, side in sides do
+			local adj = bedwars.BlockController:getStore():getBlockAt(pos + side * 3)
+			if adj then return true end
+		end
+		return false
+	end
+
+	local function getBlockItem()
+		if store.hand.toolType == 'block' and store.hand.tool then
+			return store.hand.tool.Name
+		end
+		for _, item in store.inventory.inventory.items do
+			if bedwars.ItemMeta[item.itemType].block then
+				return item.itemType
+			end
+		end
+		return nil
+	end
+
+	BlockFly = vape.Categories.Blatant:CreateModule({
+		Name = 'BlockFly',
+		Function = function(callback)
+			if callback then
+				BlockFly:Clean(inputService.InputBegan:Connect(function(input)
+					if not inputService:GetFocusedTextBox() then
+						if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
+							up = 1
+						elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL2 then
+							down = -1
+						end
+					end
+				end))
+				BlockFly:Clean(inputService.InputEnded:Connect(function(input)
+					if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
+						up = 0
+					elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL2 then
+						down = 0
+					end
+				end))
+
+				repeat
+					if entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
+						local root = entitylib.character.RootPart
+						local moveDir = entitylib.character.Humanoid.MoveDirection
+						local dt = 1 / 60
+						local wool = getBlockItem()
+
+						if wool then
+							for i = 1, Expand.Value do
+								local blockPos = getBlockBelow(root, i)
+								if canPlaceAt(blockPos) then
+									pcall(bedwars.placeBlock, blockPos, wool)
+								end
+							end
+						end
+
+						local verticalVelo = (up + down) * VerticalValue.Value
+						local rayParams = RaycastParams.new()
+						rayParams.FilterDescendantsInstances = {lplr.Character, gameCamera}
+						rayParams.RespectCanCollide = true
+
+						if moveDir.Magnitude > 0 then
+							local dest = moveDir * math.max(Value.Value, 0) * dt
+							if WallCheck.Enabled then
+								local ray = workspace:Raycast(root.Position, dest, rayParams)
+								if ray then
+									dest = (ray.Position + ray.Normal) - root.Position
+								end
+							end
+							root.CFrame += dest
+						end
+
+						root.CFrame += Vector3.new(0, verticalVelo * dt, 0)
+						root.AssemblyLinearVelocity = Vector3.new(moveDir.X * math.max(Value.Value, 0), verticalVelo, moveDir.Z * math.max(Value.Value, 0))
+					end
+					task.wait(PlaceDelay.Value)
+				until not BlockFly.Enabled
+			else
+				up, down = 0, 0
+			end
+		end,
+		Tooltip = 'Fly while placing blocks below you\nlike scaffold but in the air'
+	})
+	Value = BlockFly:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 100,
+		Default = 50,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	VerticalValue = BlockFly:CreateSlider({
+		Name = 'Vertical Speed',
+		Min = 1,
+		Max = 100,
+		Default = 50,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	Expand = BlockFly:CreateSlider({
+		Name = 'Expand',
+		Min = 1,
+		Max = 6,
+		Default = 3,
+		Tooltip = 'How many blocks ahead to place'
+	})
+	WallCheck = BlockFly:CreateToggle({
+		Name = 'Wall Check',
+		Default = true
+	})
+	PlaceDelay = BlockFly:CreateSlider({
+		Name = 'Place interval',
+		Min = 0,
+		Max = 0.1,
+		Default = 0.03,
+		Decimal = 1000,
+		Suffix = 'sec'
+	})
+end)
+
 return bedwarsmodules

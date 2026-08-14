@@ -3196,7 +3196,11 @@ run(function()
 	CannonSpeed = vape.Categories.Blatant:CreateModule({
 		Name = 'CannonSpeed',
 		Function = function(callback)
-			debug.setconstant(bedwars.CannonHandController.launchSelf, 15, callback and Value.Value or 200)
+			if callback then
+				debug.setconstant(bedwars.CannonHandController.launchSelf, 15, Value.Value)
+			else
+				debug.setconstant(bedwars.CannonHandController.launchSelf, 15, 200)
+			end
 		end,
 		Tooltip = 'Makes you go faster with cannon.'
 	})
@@ -3224,26 +3228,63 @@ end)
 
 run(function()
 	local DamageBoost
-	local stack
+	local BoostMultiplier
+	local AntiKnockback
+	local stack, hitStreak = 0, 0
 	
 	DamageBoost = vape.Categories.Blatant:CreateModule({
 		Name = 'DamageBoost',
 		Function = function(callback)
 			if callback then
+				hitStreak = 0
 				DamageBoost:Clean(vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
 					if entitylib.isAlive and tick() > (stack or 0) and damageTable.entityInstance == lplr.Character and not vape.Modules.LongJump.Enabled then
 						local horizontal = (damageTable.knockbackMultiplier and damageTable.knockbackMultiplier.horizontal or 0)
+						local vertical = (damageTable.knockbackMultiplier and damageTable.knockbackMultiplier.vertical or 0)
+
+						if AntiKnockback.Enabled then
+							local root = entitylib.character.RootPart
+							if root then
+								local kbVel = bedwars.KnockbackUtil.calculateKnockbackVelocity(Vector3.one, 1, {
+									vertical = 0,
+									horizontal = horizontal,
+								})
+								root.AssemblyLinearVelocity = root.AssemblyLinearVelocity - Vector3.new(kbVel.X, 0, kbVel.Z)
+							end
+						end
+
+						hitStreak = hitStreak + 1
+						local multiplier = BoostMultiplier.Value + (hitStreak > 3 and 0.3 or 0)
+
 						knockbackSpeed = bedwars.KnockbackUtil.calculateKnockbackVelocity(Vector3.one, 1, {
 							vertical = 0,
 							horizontal = horizontal,
-						}).Magnitude * (0.9 + store.ping.total)
+						}).Magnitude * multiplier * (0.9 + store.ping.total)
 						stack = tick() + (knockbackSpeed / 45)
-						knockbackBoost = tick() + (horizontal / 3.5)
+						knockbackBoost = tick() + (horizontal / 3.5) * multiplier
 					end
 				end))
+				DamageBoost:Clean(task.delay(3, function()
+					hitStreak = 0
+				end))
+			else
+				hitStreak = 0
 			end
 		end,
-		Tooltip = 'Makes you go slightly faster when damaged'
+		Tooltip = 'Makes you go faster when damaged.\nStreak bonus after consecutive hits.'
+	})
+	BoostMultiplier = DamageBoost:CreateSlider({
+		Name = 'Boost Multiplier',
+		Min = 0.5,
+		Max = 3,
+		Default = 1.2,
+		Decimal = 10,
+		Tooltip = 'Multiplier for the knockback speed boost'
+	})
+	AntiKnockback = DamageBoost:CreateToggle({
+		Name = 'Anti Knockback',
+		Default = false,
+		Tooltip = 'Negates the backward knockback\nwhile keeping the speed boost'
 	})
 end)
 
@@ -9413,12 +9454,36 @@ run(function()
 	end)
 end)
 
-run(function()
-	TrapDisabler = vape.Categories.Utility:CreateModule({
-		Name = 'TrapDisabler',
-		Tooltip = 'Disables Snap Traps'
-	})
-end)
+	run(function()
+		local trapParts = {}
+
+		TrapDisabler = vape.Categories.Utility:CreateModule({
+			Name = 'TrapDisabler',
+			Function = function(callback)
+				if callback then
+					TrapDisabler:Clean(collectionService:GetInstanceAddedSignal('SnapTrap'):Connect(function(obj)
+						if obj:GetAttribute('PlacedByUserId') ~= lplr.UserId then
+							table.insert(trapParts, obj)
+						end
+					end))
+					TrapDisabler:Clean(collectionService:GetInstanceRemovedSignal('SnapTrap'):Connect(function(obj)
+						local idx = table.find(trapParts, obj)
+						if idx then
+							table.remove(trapParts, idx)
+						end
+					end))
+					for _, obj in collectionService:GetTagged('SnapTrap') do
+						if obj:GetAttribute('PlacedByUserId') ~= lplr.UserId then
+							table.insert(trapParts, obj)
+						end
+					end
+				else
+					table.clear(trapParts)
+				end
+			end,
+			Tooltip = 'Disables Snap Traps'
+		})
+	end)
 
 run(function()
 	vape.Categories.World:CreateModule({
