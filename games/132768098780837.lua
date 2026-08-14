@@ -1016,6 +1016,7 @@ run(function()
 	local GeneratorToggle
 	local SelfBreak
 	local origCF
+	local currentTarget = nil
 
 	local function getPick()
 		local inv = getInventory()
@@ -1097,40 +1098,49 @@ end
 					local tool = getPick()
 					if entitylib.isAlive and tool and not isAttacking then
 						if Mode.Value == 'Teleport' then
-							-- Teleport mode: actually TP to bed, break, TP back (infinite range)
-							local didBreak = false
-							
+							-- Teleport mode: lock onto ONE bed/generator until destroyed
 							if BedToggle.Enabled then
-								for _, v in collectionService:GetTagged('BedWarsX_BedSpawn') do
-									if v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
-										origCF = entitylib.character.RootPart.CFrame
-										entitylib.character.RootPart.CFrame = CFrame.new(v.Position + Vector3.new(0, 5, 0))
-										task.wait(0.1)
-										
-										attemptBreak({v}, entitylib.character.RootPart.Position, tool)
-										
-										task.wait(0.1)
-										if origCF then entitylib.character.RootPart.CFrame = origCF end
-										didBreak = true
-										break
+								-- find target if none or current destroyed
+								if not currentTarget or not currentTarget.Parent or currentTarget:GetAttribute('BedTeamId') == (lplr.Team and lplr.Team.Name or '') or (currentTarget:GetAttribute('HP') or 10) <= 0 then
+									for _, v in collectionService:GetTagged('BedWarsX_BedSpawn') do
+										if v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
+											currentTarget = v
+											break
+										end
 									end
+								end
+
+								if currentTarget then
+									origCF = entitylib.character.RootPart.CFrame
+									entitylib.character.RootPart.CFrame = CFrame.new(currentTarget.Position + Vector3.new(0, 5, 0))
+									task.wait(0.1)
+									
+									attemptBreak({currentTarget}, entitylib.character.RootPart.Position, tool)
+									
+									task.wait(0.1)
+									if origCF then entitylib.character.RootPart.CFrame = origCF end
 								end
 							end
 							
-							if not didBreak and GeneratorToggle.Enabled then
-								for _, v in collectionService:GetTagged('BedWarsX_Resource') do
-									if (v:GetAttribute('HP') or 10) > 0 then
-										origCF = entitylib.character.RootPart.CFrame
-										entitylib.character.RootPart.CFrame = CFrame.new(v.Position + Vector3.new(0, 5, 0))
-										task.wait(0.1)
-										
-										attemptBreak({v}, entitylib.character.RootPart.Position, tool)
-										
-										task.wait(0.1)
-										if origCF then entitylib.character.RootPart.CFrame = origCF end
-										didBreak = true
-										break
+							if GeneratorToggle.Enabled and not currentTarget then
+								if not currentTarget or not currentTarget.Parent or (currentTarget:GetAttribute('HP') or 10) <= 0 then
+									for _, v in collectionService:GetTagged('BedWarsX_Resource') do
+										if (v:GetAttribute('HP') or 10) > 0 then
+											currentTarget = v
+											break
+										end
 									end
+								end
+
+								if currentTarget then
+									origCF = entitylib.character.RootPart.CFrame
+									entitylib.character.RootPart.CFrame = CFrame.new(currentTarget.Position + Vector3.new(0, 5, 0))
+									task.wait(0.1)
+									
+									attemptBreak({currentTarget}, entitylib.character.RootPart.Position, tool)
+									
+									task.wait(0.1)
+									if origCF then entitylib.character.RootPart.CFrame = origCF end
 								end
 							end
 						else
@@ -1145,11 +1155,13 @@ end
 						end
 					end
 				until not Breaker.Enabled
+				currentTarget = nil
 			else
 				origCF = nil
+				currentTarget = nil
 			end
 		end,
-		Tooltip = 'Break blocks around you\nTeleport: TP to bed, break, TP back (infinite range)\nNormal: break within range'
+		Tooltip = 'Break blocks around you\nTeleport: lock onto ONE bed until destroyed\nNormal: break within range'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
