@@ -359,8 +359,8 @@ run(function()
 	Value = Fly:CreateSlider({
 		Name = 'Speed',
 		Min = 1,
-		Max = 38,
-		Default = 38,
+		Max = 300,
+		Default = 100,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end

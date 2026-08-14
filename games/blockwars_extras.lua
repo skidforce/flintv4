@@ -587,8 +587,8 @@ run(function()
 	Value = Speed:CreateSlider({
 		Name = 'Speed',
 		Min = 16,
-		Max = 100,
-		Default = 30,
+		Max = 300,
+		Default = 100,
 		Suffix = 'studs'
 	})
 	AutoJump = Speed:CreateToggle({
@@ -598,8 +598,8 @@ run(function()
 	JumpPower = Speed:CreateSlider({
 		Name = 'Jump power',
 		Min = 50,
-		Max = 200,
-		Default = 100,
+		Max = 500,
+		Default = 200,
 		Suffix = 'studs'
 	})
 	WallCheck = Speed:CreateToggle({
