@@ -998,7 +998,9 @@ run(function()
 	local function attemptBreak(tab, localPosition, tool)
 		if not tab then return end
 		for _, v in tab do
-			if (v.Position - localPosition).Magnitude < Range.Value and v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
+			local noRangeCheck = Mode.Value == 'Auto'
+			if noRangeCheck or (v.Position - localPosition).Magnitude < Range.Value then
+				if v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
 				if tool.Parent ~= lplr.Character then
 					entitylib.character.Humanoid:EquipTool(tool)
 				end
@@ -1041,14 +1043,19 @@ run(function()
 				return true
 			end
 		end
-
-		return false
 	end
+
+	return false
+end
 
 	Breaker = vape.Categories.Minigames:CreateModule({
 		Name = 'Breaker',
 		Function = function(callback)
 			if callback then
+				if not AnticheatBypass.Enabled then
+					AnticheatBypass:Toggle()
+				end
+
 				local beds = collection('BedWarsX_BedSpawn', Breaker)
 				local generators = collection('BedWarsX_Resource', Breaker)
 
@@ -1058,7 +1065,7 @@ run(function()
 
 					local tool = getPick()
 					if entitylib.isAlive and tool and not isAttacking then
-						-- always use bypassRoot position so server thinks you're at the core
+						-- use bypassRoot position (core) for infinite range
 						local localPosition = bypassRoot and bypassRoot.Position or entitylib.character.RootPart.Position
 
 						if BedToggle.Enabled then
@@ -1073,7 +1080,7 @@ run(function()
 				origCF = nil
 			end
 		end,
-		Tooltip = 'Break blocks around you automatically'
+		Tooltip = 'Break blocks around you automatically\nUses bypassRoot position for infinite range'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
