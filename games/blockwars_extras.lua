@@ -260,21 +260,33 @@ run(function()
 end)
 
 -- ============================================
--- BREAKER (enhanced)
+-- BREAKER (enhanced with teleport mode)
 -- ============================================
 run(function()
 	local Breaker
+	local Mode
 	local Range
 	local BreakSpeed
 	local BedToggle
 	local GeneratorToggle
 	local SelfBreak
-	local Wallcheck
-	local AutoTool
-	local customHealth = {}
+	local TPDelay
+	local origCF
 
 	local function getBlockAt(pos)
 		return blocks[pos // 3]
+	end
+
+	local function breakBlockRemote(v)
+		pcall(function()
+			bw.RemoteIndex.Block_AttemptHit:FireServer(gameCamera.CFrame.Position, v.Position, v)
+		end)
+	end
+
+	local function mineBlockRemote(v)
+		pcall(function()
+			bw.RemoteIndex.Mine_AttemptHit:FireServer(v)
+		end)
 	end
 
 	local function attemptBreak(tab, localPosition)
@@ -282,13 +294,55 @@ run(function()
 		for _, v in tab do
 			if not v or not v.Parent then continue end
 			local blockPos = v.Position
-			if (blockPos - localPosition).Magnitude > Range.Value then continue end
 			if not SelfBreak.Enabled and v:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
 
-			pcall(function()
-				bw.RemoteIndex.Block_AttemptHit:FireServer(gameCamera.CFrame.Position, blockPos, v)
-			end)
-			task.wait(BreakSpeed.Value)
+			if Mode.Value == 'Teleport' then
+				if entitylib.isAlive then
+					local root = entitylib.character.RootPart
+					origCF = root.CFrame
+					-- teleport on top of the block
+					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
+					task.wait(0.05)
+					breakBlockRemote(v)
+					task.wait(BreakSpeed.Value)
+					-- teleport back
+					if origCF then
+						root.CFrame = origCF
+					end
+				end
+			else
+				if (blockPos - localPosition).Magnitude > Range.Value then continue end
+				breakBlockRemote(v)
+				task.wait(BreakSpeed.Value)
+			end
+			return true
+		end
+		return false
+	end
+
+	local function attemptBreakGen(tab, localPosition)
+		if not tab then return false end
+		for _, v in tab do
+			if not v or not v.Parent then continue end
+			local blockPos = v.Position
+
+			if Mode.Value == 'Teleport' then
+				if entitylib.isAlive then
+					local root = entitylib.character.RootPart
+					origCF = root.CFrame
+					root.CFrame = CFrame.new(blockPos + Vector3.new(0, 5, 0))
+					task.wait(0.05)
+					mineBlockRemote(v)
+					task.wait(BreakSpeed.Value)
+					if origCF then
+						root.CFrame = origCF
+					end
+				end
+			else
+				if (blockPos - localPosition).Magnitude > Range.Value then continue end
+				mineBlockRemote(v)
+				task.wait(BreakSpeed.Value)
+			end
 			return true
 		end
 		return false
@@ -298,11 +352,12 @@ run(function()
 		Name = 'Breaker',
 		Function = function(callback)
 			if callback then
+				origCF = nil
 				local beds = collectionService:GetTagged('BedWarsX_BedSpawn')
 				local generators = collectionService:GetTagged('BedWarsX_Resource')
 
 				repeat
-					task.wait(0.1)
+					task.wait(Mode.Value == 'Teleport' and TPDelay.Value or 0.1)
 					if not Breaker.Enabled then break end
 					if entitylib.isAlive then
 						local localPosition = entitylib.character.RootPart.Position
@@ -310,28 +365,46 @@ run(function()
 							if attemptBreak(beds, localPosition) then continue end
 						end
 						if GeneratorToggle.Enabled then
-							if attemptBreak(generators, localPosition) then continue end
+							if attemptBreakGen(generators, localPosition) then continue end
 						end
 					end
 				until not Breaker.Enabled
+			else
+				origCF = nil
 			end
 		end,
-		Tooltip = 'Breaks beds and resource generators'
+		Tooltip = 'Breaks beds and resource generators\nTeleport mode: TP to target, break, TP back'
+	})
+	Mode = Breaker:CreateDropdown({
+		Name = 'Mode',
+		List = {'Normal', 'Teleport'},
+		Default = 'Normal',
+		Tooltip = 'Normal: break within range\nTeleport: TP to target instantly'
 	})
 	Range = Breaker:CreateSlider({
 		Name = 'Break range',
 		Min = 1,
-		Max = 30,
+		Max = 100,
 		Default = 18,
-		Suffix = 'studs'
+		Suffix = 'studs',
+		Tooltip = 'Only used in Normal mode'
 	})
 	BreakSpeed = Breaker:CreateSlider({
 		Name = 'Break speed',
 		Min = 0,
 		Max = 0.3,
-		Default = 0.1,
+		Default = 0.05,
 		Decimal = 100,
 		Suffix = 'sec'
+	})
+	TPDelay = Breaker:CreateSlider({
+		Name = 'TP delay',
+		Min = 0,
+		Max = 0.5,
+		Default = 0.1,
+		Decimal = 100,
+		Suffix = 'sec',
+		Tooltip = 'Delay between teleports in TP mode'
 	})
 	BedToggle = Breaker:CreateToggle({
 		Name = 'Break beds',
