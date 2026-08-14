@@ -1065,14 +1065,52 @@ end
 
 					local tool = getPick()
 					if entitylib.isAlive and tool and not isAttacking then
-						-- use bypassRoot position (core) for infinite range
-						local localPosition = bypassRoot and bypassRoot.Position or entitylib.character.RootPart.Position
-
-						if BedToggle.Enabled then
-							if attemptBreak(beds, localPosition, tool) then continue end
-						end
-						if GeneratorToggle.Enabled then
-							if attemptBreak(generators, localPosition, tool) then continue end
+						if Mode.Value == 'Teleport' then
+							-- Teleport mode: actually TP to bed, break, TP back (infinite range)
+							local didBreak = false
+							
+							if BedToggle.Enabled then
+								for _, v in collectionService:GetTagged('BedWarsX_BedSpawn') do
+									if v:GetAttribute('BedTeamId') ~= (lplr.Team and lplr.Team.Name or '') and (v:GetAttribute('HP') or 10) > 0 then
+										origCF = entitylib.character.RootPart.CFrame
+										entitylib.character.RootPart.CFrame = CFrame.new(v.Position + Vector3.new(0, 5, 0))
+										task.wait(0.1)
+										
+										attemptBreak({v}, entitylib.character.RootPart.Position, tool)
+										
+										task.wait(0.1)
+										if origCF then entitylib.character.RootPart.CFrame = origCF end
+										didBreak = true
+										break
+									end
+								end
+							end
+							
+							if not didBreak and GeneratorToggle.Enabled then
+								for _, v in collectionService:GetTagged('BedWarsX_Resource') do
+									if (v:GetAttribute('HP') or 10) > 0 then
+										origCF = entitylib.character.RootPart.CFrame
+										entitylib.character.RootPart.CFrame = CFrame.new(v.Position + Vector3.new(0, 5, 0))
+										task.wait(0.1)
+										
+										attemptBreak({v}, entitylib.character.RootPart.Position, tool)
+										
+										task.wait(0.1)
+										if origCF then entitylib.character.RootPart.CFrame = origCF end
+										didBreak = true
+										break
+									end
+								end
+							end
+						else
+							-- Normal mode: range check from your position
+							local localPosition = entitylib.character.RootPart.Position
+							if BedToggle.Enabled then
+								if attemptBreak(beds, localPosition, tool) then continue end
+							end
+							if GeneratorToggle.Enabled then
+								if attemptBreak(generators, localPosition, tool) then continue end
+							end
 						end
 					end
 				until not Breaker.Enabled
@@ -1080,13 +1118,13 @@ end
 				origCF = nil
 			end
 		end,
-		Tooltip = 'Break blocks around you automatically\nUses bypassRoot position for infinite range'
+		Tooltip = 'Break blocks around you\nTeleport: TP to bed, break, TP back (infinite range)\nNormal: break within range'
 	})
 	Mode = Breaker:CreateDropdown({
 		Name = 'Mode',
-		List = {'Auto', 'Silent', 'Normal'},
-		Default = 'Auto',
-		Tooltip = 'Auto: uses bypassRoot position\nSilent: fires from your position\nNormal: range check from your position'
+		List = {'Teleport', 'Normal'},
+		Default = 'Teleport',
+		Tooltip = 'Teleport: TP to bed, break, TP back\nNormal: break within range'
 	})
 	Range = Breaker:CreateSlider({
 		Name = 'Break range',
