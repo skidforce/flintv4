@@ -1337,12 +1337,12 @@ run(function()
 		return nil
 	end
 
-	local function setGrip(tool, forward, right, up)
-		if not tool then return end
-		tool.GripForward = forward or Vector3.new(0, 0, -1)
-		tool.GripRight = right or Vector3.new(1, 0, 0)
-		tool.GripUp = up or Vector3.new(0, 1, 0)
-	end
+local function setGrip(tool, forward, right, up)
+	if not tool then return end
+	pcall(function() tool.GripForward = forward or Vector3.new(0, 0, -1) end)
+	pcall(function() tool.GripRight = right or Vector3.new(1, 0, 0) end)
+	pcall(function() tool.GripUp = up or Vector3.new(0, 1, 0) end)
+end
 
 	local function setToolAnim(tool, state)
 		if not tool then return end
