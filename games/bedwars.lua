@@ -1135,4 +1135,544 @@ run(function()
 	})
 end)
 
-return bedwarsmodules
+run(function()
+	local BlockHit
+	local BlockChance
+	local BlockDelay
+	local BlockDuration
+	local BlockMode
+	local RequireEnemy
+	local BlockRange
+	local animState = nil
+	local blockTick = tick()
+
+	local function getBlockItem()
+		for _, item in store.inventory.inventory.items do
+			if bedwars.ItemMeta[item.itemType] and bedwars.ItemMeta[item.itemType].block then
+				return item
+			end
+		end
+		return nil
+	end
+
+	local function setGrip(tool, forward, right, up)
+		if not tool then return end
+		tool.GripForward = forward or Vector3.new(0, 0, -1)
+		tool.GripRight = right or Vector3.new(1, 0, 0)
+		tool.GripUp = up or Vector3.new(0, 1, 0)
+	end
+
+	local function setToolAnim(tool, state)
+		if not tool then return end
+		local anim = tool:FindFirstChild('toolanim')
+		if not anim then
+			anim = Instance.new('StringValue')
+			anim.Name = 'toolanim'
+			anim.Parent = tool
+		end
+		anim.Value = state or 'None'
+	end
+
+	local function isHoldingSword()
+		return store.hand.tool and store.hand.toolType == 'sword'
+	end
+
+	local function hasEnemyNearby()
+		if not RequireEnemy.Enabled then return true end
+		if not entitylib.isAlive then return false end
+		local selfpos = entitylib.character.RootPart.Position
+		local plrs = entitylib.AllPosition({
+			Range = BlockRange.Value,
+			Part = 'RootPart',
+			Players = true,
+			Limit = 1
+		})
+		return #plrs > 0
+	end
+
+	BlockHit = vape.Categories.Combat:CreateModule({
+		Name = 'BlockHit',
+		Function = function(callback)
+			if callback then
+				blockTick = tick()
+				repeat
+					if isHoldingSword() and hasEnemyNearby() and entitylib.isAlive then
+						local tool = store.hand.tool
+						if tool and canSwing() then
+							local r = math.random(1, 100)
+							if r <= BlockChance.Value then
+								setToolAnim(tool, 'Block')
+								setGrip(tool, Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), Vector3.new(0, 1, 0))
+								task.wait(BlockDuration.Value / 1000)
+								setToolAnim(tool, 'Slash')
+								setGrip(tool)
+								task.wait(BlockDelay.Value / 1000)
+							end
+						end
+					end
+					task.wait()
+				until not BlockHit.Enabled
+			else
+				local tool = store.hand.tool
+				if tool then
+					setToolAnim(tool, 'None')
+					setGrip(tool)
+				end
+			end
+		end,
+		Tooltip = 'Block-hit animation for damage reduction\nand knockback resistance'
+	})
+	BlockChance = BlockHit:CreateSlider({
+		Name = 'Block chance',
+		Min = 1,
+		Max = 100,
+		Default = 50,
+		Suffix = '%'
+	})
+	BlockDelay = BlockHit:CreateSlider({
+		Name = 'Block delay',
+		Min = 10,
+		Max = 200,
+		Default = 50,
+		Suffix = 'ms'
+	})
+	BlockDuration = BlockHit:CreateSlider({
+		Name = 'Block duration',
+		Min = 10,
+		Max = 200,
+		Default = 80,
+		Suffix = 'ms'
+	})
+	BlockRange = BlockHit:CreateSlider({
+		Name = 'Enemy range',
+		Min = 5,
+		Max = 30,
+		Default = 18,
+		Suffix = function(val) return val == 1 and 'stud' or 'studs' end
+	})
+	RequireEnemy = BlockHit:CreateToggle({
+		Name = 'Require enemy nearby',
+		Default = true,
+		Tooltip = 'Only block-hit when enemies are within range'
+	})
+end)
+
+run(function()
+	local ProjectileAura
+	local Targets
+	local AuraRange
+	local AuraFOV
+	local SortMode
+	local AutoShoot
+	local ChargeTime
+	local PredictMovement
+	local TargetsBox, AuraParticles = {}, {}
+
+	local function getProjectileItem()
+		for _, item in store.inventory.inventory.items do
+			local meta = bedwars.ItemMeta[item.itemType]
+			if meta and meta.projectileSource then
+				local projSource = meta.projectileSource
+				if table.find(projSource.ammoItemTypes, 'arrow') then
+					return item, projSource
+				end
+			end
+		end
+		return nil, nil
+	end
+
+	local function predictPosition(target, dt)
+		if not PredictMovement.Enabled then return target.RootPart.Position end
+		local vel = target.RootPart.Velocity
+		local gravity = workspace.Gravity * Vector3.new(0, -0.5, 0)
+		return target.RootPart.Position + vel * dt + gravity * dt * dt
+	end
+
+	ProjectileAura = vape.Categories.Combat:CreateModule({
+		Name = 'ProjectileAura',
+		Function = function(callback)
+			if callback then
+				repeat
+					if entitylib.isAlive and store.hand.tool then
+						local bow, bowMeta = getProjectileItem()
+						if bow and bowMeta then
+							local selfpos = entitylib.character.RootPart.Position
+							local plrs = entitylib.AllPosition({
+								Range = AuraRange.Value,
+								Wallcheck = Targets.Walls.Enabled or nil,
+								Part = TargetPart and TargetPart.Value or 'RootPart',
+								Players = Targets.Players.Enabled,
+								NPCs = Targets.NPCs.Enabled,
+								Limit = 5
+							})
+
+							if #plrs > 0 then
+								local facing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+								local filtered = {}
+								for _, v in plrs do
+									local delta = (v.RootPart.Position - selfpos) * Vector3.new(1, 0, 1)
+									if delta.Magnitude > 0 then
+										local angle = math.acos(math.clamp(facing:Dot(delta.Unit), -1, 1))
+										if angle <= math.rad(AuraFOV.Value / 2) then
+											table.insert(filtered, v)
+										end
+									end
+								end
+
+								if SortMode.Value == 'Distance' then
+									table.sort(filtered, function(a, b)
+										return (a.RootPart.Position - selfpos).Magnitude < (b.RootPart.Position - selfpos).Magnitude
+									end)
+								elseif SortMode.Value == 'Health' then
+									table.sort(filtered, function(a, b)
+										return a.Humanoid.Health < b.Humanoid.Health
+									end)
+								end
+
+								if #filtered > 0 then
+									local target = filtered[1]
+									local targetPos = predictPosition(target, 0.5)
+									local aimDir = (targetPos - selfpos).Unit
+
+									targetinfo.Targets[target] = tick() + 1
+
+									for i, v in TargetsBox do
+										v.Adornee = filtered[i] and filtered[i].RootPart or nil
+									end
+
+									if AutoShoot.Enabled then
+										local tool = store.hand.tool
+										if tool and tool == bow.tool then
+											switchItem(tool, 0.05)
+											task.wait(ChargeTime.Value / 1000)
+											local projType = bowMeta.projectileType('arrow')
+											local projSpeed = bedwars.ProjectileMeta[projType] and bedwars.ProjectileMeta[projType].launchVelocity or 100
+											local shootPos = (bedwars.ProjectileController:getLaunchPosition(tool) or selfpos)
+											local shootDir = (targetPos - shootPos).Unit
+
+											local gravity = 196.2
+											local projMeta = bowMeta.projectileType and bowMeta
+											if projMeta then
+												local pmeta = projMeta.getProjectileMeta and projMeta:getProjectileMeta() or nil
+												if pmeta then
+													gravity = (pmeta.gravitationalAcceleration or 196.2) * (projMeta.gravityMultiplier or 1)
+												end
+											end
+
+											local calc = prediction.SolveTrajectory(
+												shootPos, projSpeed, gravity,
+												targetPos,
+												target.RootPart.Velocity,
+												workspace.Gravity, 0,
+												target.Humanoid.FloorMaterial == Enum.Material.Air and 42.6 or nil,
+												nil, true, selfpos, entitylib.character.RootPart, nil, true
+											)
+
+											if calc then
+												local lookDir = (calc - shootPos).Unit
+												local shootCF = CFrame.lookAlong(shootPos, lookDir)
+												pcall(function()
+													bedwars.ProjectileController:fireRelease(
+														tool, projType, projType,
+														shootCF.Position, calc,
+														lookDir * projSpeed,
+														httpService:GenerateGUID(true),
+														{drawDurationSeconds = 1},
+														workspace:GetServerTimeNow() - 0.045
+													)
+												end)
+											end
+
+											task.wait(0.3)
+										end
+									end
+								else
+									for _, v in TargetsBox do
+										v.Adornee = nil
+									end
+								end
+							else
+								for _, v in TargetsBox do
+									v.Adornee = nil
+								end
+							end
+						end
+					end
+					task.wait()
+				until not ProjectileAura.Enabled
+			else
+				for _, v in TargetsBox do
+					v.Adornee = nil
+				end
+			end
+		end,
+		Tooltip = 'Automatically aims and fires\nprojectiles at nearby enemies'
+	})
+	Targets = ProjectileAura:CreateTargets({Players = true, Walls = true})
+	AuraRange = ProjectileAura:CreateSlider({
+		Name = 'Range',
+		Min = 5,
+		Max = 100,
+		Default = 50,
+		Suffix = function(val) return val == 1 and 'stud' or 'studs' end
+	})
+	AuraFOV = ProjectileAura:CreateSlider({
+		Name = 'FOV',
+		Min = 30,
+		Max = 360,
+		Default = 180
+	})
+	TargetPart = ProjectileAura:CreateDropdown({
+		Name = 'Target part',
+		List = {'RootPart', 'Head', 'HumanoidRootPart'},
+		Default = 'RootPart'
+	})
+	SortMode = ProjectileAura:CreateDropdown({
+		Name = 'Sort targets',
+		List = {'Distance', 'Health', 'None'},
+		Default = 'Distance'
+	})
+	AutoShoot = ProjectileAura:CreateToggle({
+		Name = 'Auto shoot',
+		Default = true,
+		Tooltip = 'Automatically charges and fires\nat the nearest target'
+	})
+	ChargeTime = ProjectileAura:CreateSlider({
+		Name = 'Charge time',
+		Min = 0,
+		Max = 500,
+		Default = 100,
+		Suffix = 'ms'
+	})
+	PredictMovement = ProjectileAura:CreateToggle({
+		Name = 'Predict movement',
+		Default = true,
+		Tooltip = 'Accounts for target velocity\nwhen calculating aim'
+	})
+	ProjectileAura:CreateToggle({
+		Name = 'Show target',
+		Function = function(callback)
+			for _, v in TargetsBox do
+				v.Object.Visible = callback
+			end
+			if callback then
+				for i = 1, 5 do
+					if not TargetsBox[i] then
+						local box = Instance.new('BoxHandleAdornment')
+						box.Adornee = nil
+						box.AlwaysOnTop = true
+						box.Size = Vector3.new(3, 5, 3)
+						box.CFrame = CFrame.new(0, -0.5, 0)
+						box.ZIndex = 0
+						box.Parent = vape.gui
+						TargetsBox[i] = box
+					end
+				end
+			else
+				for _, v in TargetsBox do
+					v:Destroy()
+				end
+				table.clear(TargetsBox)
+			end
+		end
+	})
+end)
+
+run(function()
+	local SwordAnims
+	local AnimStyle
+	local AnimSpeed
+	local AnimIntensity
+	local OnlyOnAttack
+	local oldSwing
+	local oldC1
+	local playing = false
+	local connections = {}
+
+	local function getWrist()
+		local vm = gameCamera:FindFirstChild('Viewmodel')
+		if vm and vm:FindFirstChild('RightHand') then
+			return vm.RightHand:FindFirstChild('RightWrist')
+		end
+		return nil
+	end
+
+	local function lerp(a, b, t)
+		return a + (b - a) * math.clamp(t, 0, 1)
+	end
+
+	local function lerpC1(base, target, t)
+		return base:Lerp(target, math.clamp(t, 0, 1))
+	end
+
+	local function playAnimation(style, speed, intensity)
+		local wrist = getWrist()
+		if not wrist then return end
+		if not oldC1 then oldC1 = wrist.C1 end
+		playing = true
+
+		if style == 'BlockHit' then
+			task.spawn(function()
+				local t = 0
+				while playing and SwordAnims.Enabled do
+					local dt = task.wait()
+					t = t + dt * speed * 10
+					local phase = (math.sin(t) + 1) / 2
+					local blockCF = oldC1 * CFrame.Angles(0, 0, math.rad(90 * intensity))
+					local slashCF = oldC1 * CFrame.Angles(math.rad(-60 * intensity), 0, math.rad(-30 * intensity))
+					wrist.C1 = lerpC1(slashCF, blockCF, phase)
+				end
+			end)
+
+		elseif style == 'Spam' then
+			task.spawn(function()
+				local t = 0
+				while playing and SwordAnims.Enabled do
+					local dt = task.wait()
+					t = t + dt * speed * 15
+					local rx = math.sin(t * 1.3) * 40 * intensity
+					local ry = math.cos(t * 0.9) * 25 * intensity
+					local rz = math.sin(t * 2.1) * 35 * intensity
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+				end
+			end)
+
+		elseif style == 'Smooth' then
+			task.spawn(function()
+				local t = 0
+				while playing and SwordAnims.Enabled do
+					local dt = task.wait()
+					t = t + dt * speed * 4
+					local swing = math.sin(t) * intensity
+					local rx = swing * 70
+					local rz = math.cos(t * 0.5) * 20 * intensity
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), 0, math.rad(rz))
+				end
+			end)
+
+		elseif style == 'Snap' then
+			task.spawn(function()
+				while playing and SwordAnims.Enabled do
+					local snapCF = oldC1 * CFrame.Angles(math.rad(-80 * intensity), 0, math.rad(40 * intensity))
+					wrist.C1 = snapCF
+					task.wait(0.05 / speed)
+					if not playing then break end
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(30 * intensity), 0, math.rad(-20 * intensity))
+					task.wait(0.08 / speed)
+				end
+			end)
+
+		elseif style == 'Circular' then
+			task.spawn(function()
+				local t = 0
+				while playing and SwordAnims.Enabled do
+					local dt = task.wait()
+					t = t + dt * speed * 6
+					local rx = math.cos(t) * 45 * intensity
+					local ry = math.sin(t) * 30 * intensity
+					local rz = math.sin(t * 0.7) * 20 * intensity
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+				end
+			end)
+
+		elseif style == 'Jitter' then
+			task.spawn(function()
+				while playing and SwordAnims.Enabled do
+					local rx = (math.random() - 0.5) * 30 * intensity
+					local ry = (math.random() - 0.5) * 20 * intensity
+					local rz = (math.random() - 0.5) * 25 * intensity
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+					task.wait(math.random(1, 3) / (speed * 60))
+				end
+			end)
+
+		elseif style == 'Vertical' then
+			task.spawn(function()
+				local t = 0
+				while playing and SwordAnims.Enabled do
+					local dt = task.wait()
+					t = t + dt * speed * 5
+					local phase = math.sin(t)
+					local rx = phase * 80 * intensity
+					local rz = math.abs(phase) * -30 * intensity
+					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), 0, math.rad(rz))
+				end
+			end)
+		end
+	end
+
+	local function stopAnimation()
+		playing = false
+		local wrist = getWrist()
+		if wrist and oldC1 then
+			wrist.C1 = oldC1
+		end
+	end
+
+	SwordAnims = vape.Categories.Combat:CreateModule({
+		Name = 'SwordAnimations',
+		Function = function(callback)
+			if callback then
+				oldSwing = bedwars.SwordController.swingSwordAtMouse
+				bedwars.SwordController.swingSwordAtMouse = function(self, ...)
+					local result = oldSwing(self, ...)
+					if not OnlyOnAttack.Enabled then
+						stopAnimation()
+						playAnimation(AnimStyle.Value, AnimSpeed.Value, AnimIntensity.Value)
+					end
+					return result
+				end
+				if OnlyOnAttack.Enabled then
+					connections[#connections + 1] = bedwars.SwordController.swingSwordAtMouse
+				end
+			else
+				if oldSwing then
+					bedwars.SwordController.swingSwordAtMouse = oldSwing
+					oldSwing = nil
+				end
+				stopAnimation()
+				for _, c in connections do pcall(function() end) end
+				table.clear(connections)
+			end
+		end,
+		Tooltip = 'Custom viewmodel sword animations\nwith 7 different styles'
+	})
+	AnimStyle = SwordAnims:CreateDropdown({
+		Name = 'Animation style',
+		List = {'BlockHit', 'Spam', 'Smooth', 'Snap', 'Circular', 'Jitter', 'Vertical'},
+		Default = 'BlockHit',
+		Tooltip = 'BlockHit: block-slash alternation\nSpam: rapid random rotations\nSmooth: interpolated swing arc\nSnap: instant snap between poses\nCircular: continuous orbital motion\nJitter: small random offsets\nVertical: overhead chopping motion'
+	})
+	AnimSpeed = SwordAnims:CreateSlider({
+		Name = 'Animation speed',
+		Min = 0.5,
+		Max = 3,
+		Default = 1,
+		Decimal = 10
+	})
+	AnimIntensity = SwordAnims:CreateSlider({
+		Name = 'Animation intensity',
+		Min = 0.2,
+		Max = 2,
+		Default = 1,
+		Decimal = 10
+	})
+	OnlyOnAttack = SwordAnims:CreateToggle({
+		Name = 'Only on attack',
+		Default = true,
+		Tooltip = 'Only animate when swinging sword\n(false = continuous animation)'
+	})
+	SwordAnims:CreateToggle({
+		Name = 'Continuous loop',
+		Default = false,
+		Function = function(callback)
+			if callback and SwordAnims.Enabled then
+				OnlyOnAttack.Object.Visible = false
+				playAnimation(AnimStyle.Value, AnimSpeed.Value, AnimIntensity.Value)
+			else
+				OnlyOnAttack.Object.Visible = true
+			end
+		end,
+		Tooltip = 'Run animation continuously\ninstead of per-swing'
+	})
+end)
