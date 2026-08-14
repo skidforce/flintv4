@@ -1010,6 +1010,7 @@ end)
 	local PauseDuration
 	local up, down = 0, 0
 	local origWalkSpeed = 16
+	local veloThread
 
 	local adjacent = {}
 	for x = -3, 3, 3 do
@@ -1114,6 +1115,28 @@ end)
 					end
 				end))
 
+				-- velocity spoof thread: keeps reported velocity looking normal
+				veloThread = task.spawn(function()
+					while BlockFly.Enabled do
+						if entitylib.isAlive then
+							local root = entitylib.character.RootPart
+							local hum = entitylib.character.Humanoid
+							if root and hum then
+								local moveDir = hum.MoveDirection
+								if moveDir.Magnitude > 0 then
+									-- report walkspeed velocity in move direction
+									root.AssemblyLinearVelocity = Vector3.new(
+										moveDir.X * 16,
+										math.clamp(root.AssemblyLinearVelocity.Y, -50, 50),
+										moveDir.Z * 16
+									)
+								end
+							end
+						end
+						task.wait(0.05)
+					end
+				end)
+
 				repeat
 					-- periodic pause: stop briefly then continue
 					if PauseInterval.Value > 0 and tick() - lastPause >= PauseInterval.Value then
@@ -1125,7 +1148,7 @@ end)
 						task.wait(PauseDuration.Value)
 						if entitylib.isAlive then
 							local hum = entitylib.character.Humanoid
-							if hum then hum.WalkSpeed = math.max(Speed.Value, 16) end
+							if hum then hum.WalkSpeed = origWalkSpeed end
 						end
 						lastPause = tick()
 						pausing = false
@@ -1136,13 +1159,16 @@ end)
 						local hum = entitylib.character.Humanoid
 						local moveDir = hum.MoveDirection
 
-						-- set walkspeed for horizontal movement
-						hum.WalkSpeed = math.max(Speed.Value, 16)
-
 						-- place blocks
 						for i = Expand.Value, 1, -1 do
 							local blockPos = roundPos(root.Position - Vector3.new(0, hum.HipHeight + 1.5, 0) + moveDir * (i * 3))
 							pcall(placeBlockSmart, blockPos)
+						end
+
+						-- horizontal via Move: direction * speed factor, the Humanoid handles physics
+						if moveDir.Magnitude > 0 then
+							local speedFactor = math.clamp(Speed.Value / 16, 1, 6)
+							hum:Move(moveDir * speedFactor, false)
 						end
 
 						-- vertical via JumpPower
@@ -1161,7 +1187,7 @@ end)
 							)
 						end
 
-						-- wall check: slow down if about to hit
+						-- wall check: stop if about to hit
 						if WallCheck.Enabled and moveDir.Magnitude > 0 then
 							local rayParams = RaycastParams.new()
 							rayParams.FilterDescendantsInstances = {lplr.Character, gameCamera}
@@ -1176,6 +1202,7 @@ end)
 				until not BlockFly.Enabled
 			else
 				up, down = 0, 0
+				if veloThread then task.cancel(veloThread) veloThread = nil end
 				if entitylib.isAlive then
 					local hum = entitylib.character.Humanoid
 					if hum then
