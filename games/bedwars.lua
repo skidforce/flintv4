@@ -992,7 +992,7 @@ run(function()
 	})
 end)
 
-run(function()
+	run(function()
 	local BlockFly
 	local Value
 	local VerticalValue
@@ -1000,6 +1000,8 @@ run(function()
 	local Expand
 	local PlaceDelay
 	local up, down = 0, 0
+	local spoofY = 0
+	local spoofTick = tick()
 
 	local adjacent = {}
 	for x = -3, 3, 3 do
@@ -1105,19 +1107,23 @@ run(function()
 					if entitylib.isAlive and isnetworkowner(entitylib.character.RootPart) then
 						local root = entitylib.character.RootPart
 						local moveDir = entitylib.character.Humanoid.MoveDirection
+						local dt = task.wait(PlaceDelay.Value)
 
 						for i = Expand.Value, 1, -1 do
 							local blockPos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0) + moveDir * (i * 3))
 							pcall(placeBlockSmart, blockPos)
 						end
 
+						local realSpeed = math.max(Value.Value, 0)
 						local verticalVelo = (up + down) * VerticalValue.Value
+
+						-- actual movement via CFrame
 						local rayParams = RaycastParams.new()
 						rayParams.FilterDescendantsInstances = {lplr.Character, gameCamera}
 						rayParams.RespectCanCollide = true
 
 						if moveDir.Magnitude > 0 then
-							local dest = moveDir * math.max(Value.Value, 0) * (1 / 60)
+							local dest = moveDir * realSpeed * dt
 							if WallCheck.Enabled then
 								local ray = workspace:Raycast(root.Position, dest, rayParams)
 								if ray then
@@ -1126,14 +1132,33 @@ run(function()
 							end
 							root.CFrame += dest
 						end
+						root.CFrame += Vector3.new(0, verticalVelo * dt, 0)
 
-						root.CFrame += Vector3.new(0, verticalVelo * (1 / 60), 0)
-						root.AssemblyLinearVelocity = Vector3.new(moveDir.X * math.max(Value.Value, 0), verticalVelo, moveDir.Z * math.max(Value.Value, 0))
+						-- spoof velocity: cap horizontal to walkspeed (~16), fake vertical as jump
+						spoofY = spoofY + verticalVelo * dt
+						spoofTick = spoofTick + dt
+						local spoofedX = moveDir.X * math.min(realSpeed, 16)
+						local spoofedZ = moveDir.Z * math.min(realSpeed, 16)
+						-- fake a jump arc when going up
+						if verticalVelo > 0 then
+							spoofedX = moveDir.X * 16
+							spoofedZ = moveDir.Z * 16
+						end
+						-- decay vertical spoof toward 0 like gravity
+						if spoofY > 0.5 then
+							spoofY = spoofY - 196.2 * dt * dt
+						elseif spoofY < 0 then
+							spoofY = 0
+						end
+						root.AssemblyLinearVelocity = Vector3.new(spoofedX, verticalVelo > 0 and 50 or math.clamp(spoofY, -16, 16), spoofedZ)
+					else
+						task.wait(0.1)
 					end
-					task.wait(PlaceDelay.Value)
 				until not BlockFly.Enabled
 		else
 			up, down = 0, 0
+			spoofY = 0
+			spoofTick = tick()
 			if entitylib.isAlive then
 				local root = entitylib.character.RootPart
 				if root then
