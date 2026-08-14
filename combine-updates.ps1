@@ -40,6 +40,8 @@ $MERGE_FOLDERS = @("games", "guis", "profiles", "libraries", "assets")
 # These are our modifications that diverge from both Pistonware and CatV6
 $PROTECTED_FILES = @(
     "games/bedwars.lua",
+    "games/6872274481.lua",
+    "games/6872265039.lua",
     "libraries/prediction.lua"
 )
 

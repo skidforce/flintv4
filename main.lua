@@ -44,22 +44,20 @@ local function checkForUpdates()
 
 	if remoteVersion ~= '' and remoteVersion ~= localVersion then
 		warn('[flintv4] Update detected ('..(localVersion ~= '' and localVersion or 'none')..' -> '..remoteVersion..')')
-		-- Delete stale cached game scripts and bedwars.lua so they get re-downloaded
-		local staleFiles = {
-			'flintv4/games/bedwars.lua',
-		}
-		-- Also delete all cached game scripts for this game
+		-- Delete cached game scripts that still have the watermark (unmodified downloads).
+		-- Files edited locally won't have the watermark and are preserved.
 		for _, placeId in {'6872274481', '6872265039', '8560631822', '8444591321'} do
-			table.insert(staleFiles, 'flintv4/games/'..placeId..'.lua')
-		end
-		for _, path in staleFiles do
+			local path = 'flintv4/games/'..placeId..'.lua'
 			if isfile(path) then
-				pcall(delfile, path)
+				local ok, content = pcall(readfile, path)
+				if ok and type(content) == 'string' and content:sub(1, 60):find('watermark') then
+					pcall(delfile, path)
+					warn('[flintv4] Deleted unmodified cached: '..placeId..'.lua')
+				end
 			end
 		end
-		-- Update local version
 		pcall(writefile, 'flintv4/version.txt', remoteVersion)
-		warn('[flintv4] Cache cleared, files will re-download')
+		warn('[flintv4] Version updated to '..remoteVersion)
 	end
 end
 pcall(checkForUpdates)

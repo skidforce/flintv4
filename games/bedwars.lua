@@ -45,9 +45,15 @@ run(function()
 	local SortMode
 	local SmoothRotation
 	local MultiSwing
+	local BypassMode
+	local JitterAmount
 	local Particles, Boxes, AttackDelay = {}, {}, tick()
 	local lastTargets = {}
 	local rotateAngle = 0
+
+	local function getEmitter(part)
+		return part and part:FindFirstChildOfClass('ParticleEmitter')
+	end
 
 	local function getAttackData()
 		if Mouse.Enabled then
@@ -93,7 +99,7 @@ run(function()
 							Part = 'RootPart',
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Limit = Max.Value + 5
+							Limit = Max.Value + 10
 						})
 
 						if #plrs > 0 then
@@ -120,21 +126,46 @@ run(function()
 								targetinfo.Targets[v] = tick() + 1
 							end
 
-							if #attacked > 0 then
-								local attackCount = Silent.Enabled and #attacked or 1
-								local swingCount = MultiSwing.Enabled and math.min(#attacked, 3) or 1
+						if #attacked > 0 then
+							local attackCount = Silent.Enabled and #attacked or 1
+							local swingCount = MultiSwing.Enabled and math.min(#attacked, 3) or 1
 
-								for swing = 1, swingCount do
-									if AttackDelay < tick() then
-										local cpsValue = CPS.GetRandomValue()
-										AttackDelay = tick() + (1 / cpsValue) + (math.random(-10, 10) / 1000)
+							for swing = 1, swingCount do
+								if AttackDelay < tick() then
+									local cpsValue = CPS.GetRandomValue()
+									local baseDelay = 1 / cpsValue
+									AttackDelay = tick() + baseDelay + (math.random(-10, 10) / 1000)
 
-										if Silent.Enabled and attacked[swing] then
-											local target = attacked[swing].Entity
-											local targetPos = target.RootPart.Position
-											local lookDir = (targetPos - selfpos).Unit
+									if BypassMode.Value == 'Random Delay' then
+										AttackDelay = AttackDelay + (math.random(0, 15) / 1000)
+									end
+
+									if Silent.Enabled and attacked[swing] then
+										local target = attacked[swing].Entity
+										local targetPos = target.RootPart.Position
+										local lookDir = (targetPos - selfpos).Unit
+										local oldCF = entitylib.character.RootPart.CFrame
+
+										local jitterOffset = Vector3.zero
+										if BypassMode.Value == 'CFrame Jitter' then
+											local j = JitterAmount.Value
+											jitterOffset = Vector3.new(
+												math.random(-j * 100, j * 100) / 100,
+												0,
+												math.random(-j * 100, j * 100) / 100
+											)
+										end
+
+										local aimPos = selfpos + jitterOffset
+										entitylib.character.RootPart.CFrame = CFrame.lookAt(aimPos, Vector3.new(targetPos.X + jitterOffset.X, aimPos.Y, targetPos.Z + jitterOffset.Z))
+										bedwars.SwordController:swingSwordAtMouse()
+										entitylib.character.RootPart.CFrame = oldCF
+									else
+										if BypassMode.Value == 'CFrame Jitter' then
+											local j = JitterAmount.Value
 											local oldCF = entitylib.character.RootPart.CFrame
-											entitylib.character.RootPart.CFrame = CFrame.lookAt(selfpos, Vector3.new(targetPos.X, selfpos.Y, targetPos.Z))
+											local offset = CFrame.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
+											entitylib.character.RootPart.CFrame = oldCF * offset
 											bedwars.SwordController:swingSwordAtMouse()
 											entitylib.character.RootPart.CFrame = oldCF
 										else
@@ -143,6 +174,7 @@ run(function()
 									end
 								end
 							end
+						end
 
 							for _, data in attacked do
 								lastTargets[data.Entity] = tick()
@@ -159,8 +191,10 @@ run(function()
 					end
 
 					for i, v in Particles do
-						v.Position = attacked[i] and attacked[i].Entity.RootPart.Position or Vector3.new(9e9, 9e9, 9e9)
-						v.Parent = attacked[i] and gameCamera or nil
+						local pos = attacked[i] and attacked[i].Entity.RootPart.Position or Vector3.new(9e9, 9e9, 9e9)
+						v.Position = pos
+						local em = getEmitter(v)
+						if em then em.Parent = attacked[i] and gameCamera or nil end
 					end
 
 					if not Silent.Enabled and Face.Enabled and attacked[1] then
@@ -184,11 +218,13 @@ run(function()
 			else
 				lastTargets = {}
 				for _, v in Boxes do
-					v.Adornee = nil
+					v:Destroy()
 				end
 				for _, v in Particles do
-					v.Parent = nil
+					v:Destroy()
 				end
+				table.clear(Boxes)
+				table.clear(Particles)
 			end
 		end,
 		Tooltip = 'Attack players around you\nwithout aiming at them.\nSilent mode rotates attack only.'
@@ -204,7 +240,7 @@ run(function()
 	SwingRange = Killaura:CreateSlider({
 		Name = 'Swing range',
 		Min = 1,
-		Max = 30,
+		Max = 50,
 		Default = 18,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
@@ -213,7 +249,7 @@ run(function()
 	AttackRange = Killaura:CreateSlider({
 		Name = 'Attack range',
 		Min = 1,
-		Max = 18,
+		Max = 50,
 		Default = 18,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
@@ -223,13 +259,13 @@ run(function()
 		Name = 'Max angle',
 		Min = 1,
 		Max = 360,
-		Default = 90
+		Default = 180
 	})
 	Max = Killaura:CreateSlider({
 		Name = 'Max targets',
 		Min = 1,
-		Max = 10,
-		Default = 10
+		Max = 20,
+		Default = 15
 	})
 	SortMode = Killaura:CreateDropdown({
 		Name = 'Sort targets',
@@ -249,6 +285,26 @@ run(function()
 		Name = 'Multi swing',
 		Tooltip = 'Attacks multiple targets per tick'
 	})
+	BypassMode = Killaura:CreateDropdown({
+		Name = 'Bypass mode',
+		List = {'None', 'Random Delay', 'CFrame Jitter'},
+		Default = 'None',
+		Tooltip = 'Random Delay: adds random delays\nCFrame Jitter: small random position offsets',
+		Function = function(val)
+			JitterAmount.Object.Visible = val == 'CFrame Jitter'
+		end
+	})
+	JitterAmount = Killaura:CreateSlider({
+		Name = 'Jitter amount',
+		Min = 0.1,
+		Max = 2,
+		Default = 0.3,
+		Decimal = 10,
+		Visible = false,
+		Function = function(val)
+			JitterAmount.Object.Visible = BypassMode.Value == 'CFrame Jitter'
+		end
+	})
 	Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
 	Killaura:CreateToggle({
 		Name = 'Show target',
@@ -256,7 +312,7 @@ run(function()
 			BoxSwingColor.Object.Visible = callback
 			BoxAttackColor.Object.Visible = callback
 			if callback then
-				for i = 1, 10 do
+				for i = 1, 20 do
 					local box = Instance.new('BoxHandleAdornment')
 					box.Adornee = nil
 					box.AlwaysOnTop = true
@@ -295,19 +351,20 @@ run(function()
 			ParticleColor2.Object.Visible = callback
 			ParticleSize.Object.Visible = callback
 			if callback then
-				for i = 1, 10 do
+				for i = 1, 20 do
 					local part = Instance.new('Part')
 					part.Size = Vector3.new(2, 4, 2)
 					part.Anchored = true
 					part.CanCollide = false
 					part.Transparency = 1
 					part.Parent = gameCamera
-					Particles[i] = Instance.new('ParticleEmitter')
-					Particles[i].Parent = part
+					local emitter = Instance.new('ParticleEmitter')
+					emitter.Parent = part
+					Particles[i] = part
 				end
 			else
 				for _, v in Particles do
-					v.Parent:Destroy()
+					v:Destroy()
 				end
 				table.clear(Particles)
 			end
@@ -325,7 +382,8 @@ run(function()
 		Visible = false,
 		Function = function(hue, sat, val)
 			for _, v in Particles do
-				v.Color = ColorSequence.new(Color3.fromHSV(hue, sat, val), ParticleColor2.Object.Value)
+				local em = getEmitter(v)
+				if em then em.Color = ColorSequence.new(Color3.fromHSV(hue, sat, val), ParticleColor2.Object.Value) end
 			end
 		end
 	})
@@ -336,7 +394,8 @@ run(function()
 		Visible = false,
 		Function = function(hue, sat, val)
 			for _, v in Particles do
-				v.Color = ColorSequence.new(ParticleColor1.Object.Value, Color3.fromHSV(hue, sat, val))
+				local em = getEmitter(v)
+				if em then em.Color = ColorSequence.new(ParticleColor1.Object.Value, Color3.fromHSV(hue, sat, val)) end
 			end
 		end
 	})
@@ -349,7 +408,8 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, v in Particles do
-				v.Size = NumberSequence.new(val)
+				local em = getEmitter(v)
+				if em then em.Size = NumberSequence.new(val) end
 			end
 		end
 	})
@@ -727,7 +787,7 @@ run(function()
 				if (v:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
 				if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
 
-				bedwars.breakBlock(v, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, Wallcheck.Enabled, 'Health', not route)
+				pcall(bedwars.breakBlock, v, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, Wallcheck.Enabled, 'Health', not route)
 				task.wait(BreakSpeed.Value)
 				return true
 			end
@@ -775,7 +835,7 @@ run(function()
 				if not Breaker.Enabled then break end
 				if not block.Parent then continue end
 
-				bedwars.breakBlock(block, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, false, 'Health', false)
+				pcall(bedwars.breakBlock, block, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, false, 'Health', false)
 				chainCount += 1
 				task.wait(BreakSpeed.Value)
 			end
@@ -790,24 +850,26 @@ run(function()
 		Function = function(callback)
 			if callback then
 				local beds = collection('bed', Breaker)
-				local teslas = collection('tesla-trap', Breaker, function(tab, obj)
-					task.delay(0.1, function()
-						if not Breaker.Enabled or not obj.Parent then return end
-						local player = playersService:GetPlayerByUserId(obj:GetAttribute('PlacedByUserId'))
-						if player and player:GetAttribute('Team') ~= lplr:GetAttribute('Team') then
-							table.insert(tab, obj)
-						end
-					end)
+			local teslas = collection('tesla-trap', Breaker, function(tab, obj)
+				task.delay(0.1, function()
+					if not Breaker.Enabled or not obj.Parent then return end
+					local uid = obj:GetAttribute('PlacedByUserId')
+					local player = uid and playersService:GetPlayerByUserId(uid)
+					if player and player:GetAttribute('Team') ~= lplr:GetAttribute('Team') then
+						table.insert(tab, obj)
+					end
 				end)
-				local hives = collection('beehive', Breaker, function(tab, obj)
-					task.delay(0.1, function()
-						if not Breaker.Enabled or not obj.Parent then return end
-						local player = playersService:GetPlayerByUserId(obj:GetAttribute('PlacedByUserId'))
-						if player and player:GetAttribute('Team') ~= lplr:GetAttribute('Team') then
-							table.insert(tab, obj)
-						end
-					end)
+			end)
+			local hives = collection('beehive', Breaker, function(tab, obj)
+				task.delay(0.1, function()
+					if not Breaker.Enabled or not obj.Parent then return end
+					local uid = obj:GetAttribute('PlacedByUserId')
+					local player = uid and playersService:GetPlayerByUserId(uid)
+					if player and player:GetAttribute('Team') ~= lplr:GetAttribute('Team') then
+						table.insert(tab, obj)
+					end
 				end)
+			end)
 				local luckyblock = collection('LuckyBlock', Breaker)
 				local ironores = collection('iron_ore_mesh_block', Breaker)
 

@@ -1751,7 +1751,9 @@ run(function()
 					if effects then
 						local blockdmg = (blockhealthbar.blockHealth - (result == 'destroyed' and 0 or getBlockHealth(dblock, dpos)))
 						customHealthbar = customHealthbar or bedwars.BlockBreaker.updateHealthbar
-						customHealthbar(bedwars.BlockBreaker, {blockPosition = dpos}, blockhealthbar.blockHealth, dblock:GetAttribute('MaxHealth'), blockdmg, dblock)
+						if type(customHealthbar) == 'function' then
+							pcall(customHealthbar, bedwars.BlockBreaker, {blockPosition = dpos}, blockhealthbar.blockHealth, dblock:GetAttribute('MaxHealth'), blockdmg, dblock)
+						end
 						blockhealthbar.blockHealth = math.max(blockhealthbar.blockHealth - blockdmg, 0)
 
 						if blockhealthbar.blockHealth <= 0 then
@@ -3729,17 +3731,17 @@ run(function()
 						lookVector = dir
 					})
 	
-					local broken = 0.1
-					if bedwars.BlockController:calculateBlockDamage(lplr, {blockPosition = blockpos}) < block:GetAttribute('Health') then
-						broken = 0.4
-						bedwars.breakBlock(block, true, true)
-					end
+				local broken = 0.1
+				if bedwars.BlockController:calculateBlockDamage(lplr, {blockPosition = blockpos}) < block:GetAttribute('Health') then
+					broken = 0.4
+					pcall(bedwars.breakBlock, block, true, true)
+				end
 	
-					task.delay(broken, function()
-						for _ = 1, 3 do
-							local call = bedwars.Handler:Get('LaunchSelfFromCannon'):Fire('CallServer', {cannonBlockPos = blockpos})
-							if call then
-								bedwars.breakBlock(block, true, true)
+				task.delay(broken, function()
+					for _ = 1, 3 do
+						local call = bedwars.Handler:Get('LaunchSelfFromCannon'):Fire('CallServer', {cannonBlockPos = blockpos})
+						if call then
+							pcall(bedwars.breakBlock, block, true, true)
 								JumpSpeed = 5.25 * Value.Value
 								JumpTick = tick() + 2.3
 								Direction = Vector3.new(dir.X, 0, dir.Z).Unit
@@ -9273,6 +9275,7 @@ run(function()
 	
 	local function record(plr, checktype)
 		local category = categoryOf(checktype)
+		if type(counts[category]) ~= 'number' then counts[category] = 0 end
 		counts[category] += 1
 		table.insert(entries, 1, {Name = plr.Name, Reason = checktype, Category = category})
 		refreshViewer()
@@ -12978,7 +12981,7 @@ run(function()
 					if Break.Enabled and block and block.Parent and entitylib.isAlive and canBreak() then
 						task.spawn(function()
 							if getBlockHits(block, block.Position) > 1 then
-								bedwars.breakBlock(block, true, true, nil, Switch.Enabled)
+								pcall(bedwars.breakBlock, block, true, true, nil, Switch.Enabled)
 							end
 						end)
 					end
@@ -13506,7 +13509,7 @@ run(function()
 						for _, v in collectionService:GetTagged('HarvestableCrop') do
 							if v:IsA('BasePart') and (v.Position - origin).Magnitude <= Range.Value then
 								nextHarvest = tick() + Delay.Value
-								bedwars.breakBlock(v, true, true, nil, Switch.Enabled)
+								pcall(bedwars.breakBlock, v, true, true, nil, Switch.Enabled)
 								break
 							end
 						end
@@ -13680,7 +13683,7 @@ run(function()
 						if Break.Enabled and entitylib.isAlive and store.equippedKit == 'gingerbread_man' and block and block:IsA('BasePart') and (not OwnOnly.Enabled or block:GetAttribute('PlacedByUserId') == lplr.UserId) and (block.Position - entitylib.character.RootPart.Position).Magnitude <= Range.Value then
 							task.delay(Delay.Value, function()
 								if AutoGingerbread.Enabled and block.Parent then
-									bedwars.breakBlock(block, false, nil, nil, Switch.Enabled)
+									pcall(bedwars.breakBlock, block, false, nil, nil, Switch.Enabled)
 								end
 							end)
 						end
