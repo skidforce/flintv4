@@ -850,6 +850,12 @@ run(function()
 				task.wait(BreakSpeed.Value)
 			end
 
+			-- actually break the bed after clearing the path
+			if Breaker.Enabled and bed.Parent then
+				pcall(bedwars.breakBlock, bed, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, false, 'Health', false)
+				chainCount += 1
+			end
+
 			if chainCount > 0 then return true end
 		end
 		return false
