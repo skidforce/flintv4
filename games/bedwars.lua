@@ -617,7 +617,14 @@ run(function()
 	local Wallcheck
 	local AutoTool
 	local CustomHealth
+	local BreakThrough
+	local ChainBreaks
 	local customHealth = {}
+
+	local function getBlockAt(pos)
+		local block = bedwars.BlockController:getStore():getBlockAt(pos)
+		return block
+	end
 
 	local function attemptBreak(tab, localPosition, route)
 		if not tab then return end
@@ -631,6 +638,56 @@ run(function()
 				task.wait(BreakSpeed.Value)
 				return true
 			end
+		end
+		return false
+	end
+
+	local function getBlocksAlongPath(from, to)
+		local blocks = {}
+		local dir = to - from
+		local dist = dir.Magnitude
+		if dist == 0 then return blocks end
+		local unit = dir.Unit
+		local step = 3
+		local steps = math.ceil(dist / step)
+		for i = 1, steps do
+			local pos = from + unit * math.min(i * step, dist)
+			local blockPos = Vector3.new(math.floor(pos.X / 3 + 0.5) * 3, math.floor(pos.Y / 3 + 0.5) * 3, math.floor(pos.Z / 3 + 0.5) * 3)
+			local block = getBlockAt(blockPos)
+			if block and not blocks[block] then
+				if not SelfBreak.Enabled and block:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
+				if (block:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
+				if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
+				blocks[block] = true
+				table.insert(blocks, block)
+			end
+		end
+		return blocks
+	end
+
+	local function breakThroughBeds(beds, localPosition)
+		if not beds then return false end
+		for _, bed in beds do
+			if (bed.Position - localPosition).Magnitude > Range.Value then continue end
+			if (bed:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
+			if not SelfBreak.Enabled and bed:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
+			if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
+
+			local chainCount = 0
+			local maxChains = ChainBreaks.Value
+			local pathBlocks = getBlocksAlongPath(localPosition, bed.Position)
+
+			for _, block in pathBlocks do
+				if chainCount >= maxChains then break end
+				if not Breaker.Enabled then break end
+				if not block.Parent then continue end
+
+				bedwars.breakBlock(block, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealth or nil, AutoTool.Enabled, false, 'Health', false)
+				chainCount += 1
+				task.wait(BreakSpeed.Value)
+			end
+
+			if chainCount > 0 then return true end
 		end
 		return false
 	end
@@ -667,7 +724,11 @@ run(function()
 					if entitylib.isAlive then
 						local localPosition = entitylib.character.RootPart.Position
 
-						if attemptBreak(Bed.Enabled and beds, localPosition, true) then continue end
+						if BreakThrough.Enabled then
+							if breakThroughBeds(Bed.Enabled and beds, localPosition) then continue end
+						else
+							if attemptBreak(Bed.Enabled and beds, localPosition, true) then continue end
+						end
 						if attemptBreak(Hive.Enabled and hives, localPosition) then continue end
 						if attemptBreak(Tesla.Enabled and teslas, localPosition) then continue end
 						if attemptBreak(LuckyBlock.Enabled and luckyblock, localPosition) then continue end
@@ -750,6 +811,19 @@ run(function()
 	LimitItem = Breaker:CreateToggle({
 		Name = 'Limit to items',
 		Tooltip = 'Only breaks when tools are held'
+	})
+	BreakThrough = Breaker:CreateToggle({
+		Name = 'Break Through',
+		Default = true,
+		Tooltip = 'Breaks blocks between you and the bed\nto reach it through walls'
+	})
+	ChainBreaks = Breaker:CreateSlider({
+		Name = 'Chain breaks per tick',
+		Min = 1,
+		Max = 10,
+		Default = 3,
+		Darker = true,
+		Tooltip = 'How many blocks to break per update tick\nwhen breaking through walls'
 	})
 end)
 

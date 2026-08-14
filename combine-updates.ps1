@@ -4,6 +4,7 @@
 .DESCRIPTION
     Pulls latest from both upstream repos, merges new/updated files,
     rebrands references, removes key systems, and pushes to FlintV4.
+    Protects FlintV4 custom files (bedwars.lua, prediction.lua, custom loader).
 .PARAMETER SkipPush
     Skip the final git push (for testing).
 .PARAMETER DryRun
@@ -26,9 +27,21 @@ $TEMP_DIR       = Join-Path $env:TEMP "flintv4-combine-$(Get-Date -Format 'yyyyM
 $PISTON_REPO    = "https://github.com/themagicpiston/pistonware.git"
 $CATV6_REPO     = "https://github.com/Maxlasertech/CatV6.git"
 
-$PISTON_BASE_FILES = @("loader.lua", "main.lua", "NewMainScript.lua", "reinstall.lua", "loadstring", "whitelist.json", "gui.txt")
+# Files from Pistonware that get updated (base files)
+$PISTON_BASE_FILES = @("loader.lua", "main.lua", "NewMainScript.lua")
+
+# CatV6 extras that get updated
 $CATV6_EXTRAS = @("guis/liquidbounce.lua", "guis/wurst.lua", "libraries/premium.lua")
+
+# Folders to merge from both repos
 $MERGE_FOLDERS = @("games", "guis", "profiles", "libraries", "assets")
+
+# FlintV4 custom files that should NOT be overwritten by upstream
+# These are our modifications that diverge from both Pistonware and CatV6
+$PROTECTED_FILES = @(
+    "games/bedwars.lua",
+    "libraries/prediction.lua"
+)
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  FlintV4 Auto-Combine Script" -ForegroundColor Cyan
@@ -75,7 +88,7 @@ foreach ($file in $CATV6_EXTRAS) {
 }
 Write-Host ""
 
-# === STEP 5: MERGE FOLDERS ===
+# === STEP 5: MERGE FOLDERS (skip protected files) ===
 Write-Host "[5/8] Merging folders..." -ForegroundColor Yellow
 foreach ($folder in $MERGE_FOLDERS) {
     $pistonDir = Join-Path $TEMP_DIR "pistonware" $folder
@@ -91,8 +104,13 @@ foreach ($folder in $MERGE_FOLDERS) {
     }
 
     $allFiles = ($pistonFiles + $catv6Files) | Sort-Object -Unique
-    $updated = 0
+    $updated = 0; $skipped = 0
     foreach ($relPath in $allFiles) {
+        $relNorm = $relPath -replace '\\', '/'
+        if ($PROTECTED_FILES -contains "$folder/$relNorm") {
+            $skipped++
+            continue
+        }
         $pistonSrc = Join-Path $pistonDir $relPath
         $catv6Src  = Join-Path $catv6Dir $relPath
         $dst       = Join-Path $flintDir $relPath
@@ -106,7 +124,8 @@ foreach ($folder in $MERGE_FOLDERS) {
             $updated++
         }
     }
-    Write-Host "  $folder`: $updated files processed" -ForegroundColor Gray
+    $skipMsg = if ($skipped -gt 0) { " ($skipped protected)" } else { "" }
+    Write-Host "  ${folder}: $updated files processed${skipMsg}" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -125,16 +144,22 @@ if (-not $DryRun) {
         $content = $content -replace 'gitlab\.com/pistonware/pistonware/-/raw/main/bedwars\.lua', 'raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua'
         $content = $content -replace 'codeberg\.org/pistonware/pistonware/raw/branch/main/', 'raw.githubusercontent.com/skidforce/flintv4/main/'
         $content = $content -replace 'Maxlasertech/CatV6', 'skidforce/flintv4'
+        $content = $content -replace 'github\.com/Maxlasertech', 'github.com/skidforce'
 
         # Paths
         $content = $content -replace "'pistonware/", "'flintv4/"
         $content = $content -replace '"pistonware/', '"flintv4/'
         $content = $content -replace 'catsix/', 'flintv4/'
+        $content = $content -replace "'catv6/", "'flintv4/"
+        $content = $content -replace '"catv6/', '"flintv4/'
 
         # Strings
         $content = $content -replace '\[pistonware\]', '[flintv4]'
         $content = $content -replace "'Pistonware'", "'FlintV4'"
         $content = $content -replace '"Pistonware"', '"FlintV4"'
+        $content = $content -replace "'CatV6'", "'FlintV4'"
+        $content = $content -replace '"CatV6"', '"FlintV4"'
+        $content = $content -replace '\[CatV6\]', '[flintv4]'
         $content = $content -replace 'PistonwareDownloader', 'FlintV4Downloader'
         $content = $content -replace 'PistonwareLoaderBoot', 'FlintV4LoaderBoot'
         $content = $content -replace 'PistonwareLoaderTeardown', 'FlintV4LoaderTeardown'
@@ -147,6 +172,7 @@ if (-not $DryRun) {
 
         # CatV6 commit.txt fix
         $content = $content -replace "readfile\('flintv4/profiles/commit\.txt'\)", "'main'"
+        $content = $content -replace "readfile\('catv6/profiles/commit\.txt'\)", "'main'"
 
         if ($content -ne $original) {
             Set-Content $file.FullName $content -NoNewline
@@ -181,6 +207,15 @@ if (-not $DryRun) {
         # Remove shared.XKey and script_key references
         $content = $content -replace "shared\.\w+Key\s*=\s*[^;]+;\s*", ""
         $content = $content -replace "script_key\s*=\s*[^;]+;\s*", ""
+
+        # Remove CatV6 key system patterns
+        $content = $content -replace "(?s)if not shared\.Key then.*?end\r?\n?", ""
+        $content = $content -replace "(?s)shared\.Key\s*=.*?;\s*", ""
+        $content = $content -replace "(?s)local key\s*=.*?;\s*", ""
+
+        # Remove downloadKey / keyCheck patterns
+        $content = $content -replace "(?s)local function downloadKey\(\).*?end\r?\n?", ""
+        $content = $content -replace "(?s)if not downloadKey\(\) then.*?end\r?\n?", ""
 
         if ($content -ne $original) {
             Set-Content $file.FullName $content -NoNewline

@@ -3346,6 +3346,7 @@ run(function()
 	local WallCheck
 	local PopBalloons
 	local TP
+	local FlyMode
 	local rayCheck = RaycastParams.new()
 	rayCheck.RespectCanCollide = true
 	local up, down, old = 0, 0
@@ -3357,64 +3358,106 @@ run(function()
 			updateVelocity()
 			if callback then
 				up, down, old = 0, 0, bedwars.BalloonController.deflateBalloon
-				bedwars.BalloonController.deflateBalloon = function() end
-				local tpTick, tpToggle, oldy = tick(), true
 
-				if lplr.Character and (lplr.Character:GetAttribute('InflatedBalloons') or 0) == 0 and getItem('balloon') then
-					bedwars.BalloonController:inflateBalloon()
-				end
-				Fly:Clean(vapeEvents.AttributeChanged.Event:Connect(function(changed)
-					if changed == 'InflatedBalloons' and (lplr.Character:GetAttribute('InflatedBalloons') or 0) == 0 and getItem('balloon') then
+				if FlyMode.Value == 'Balloon' then
+					bedwars.BalloonController.deflateBalloon = function() end
+					if lplr.Character and (lplr.Character:GetAttribute('InflatedBalloons') or 0) == 0 and getItem('balloon') then
 						bedwars.BalloonController:inflateBalloon()
 					end
-				end))
+					Fly:Clean(vapeEvents.AttributeChanged.Event:Connect(function(changed)
+						if changed == 'InflatedBalloons' and (lplr.Character:GetAttribute('InflatedBalloons') or 0) == 0 and getItem('balloon') then
+							bedwars.BalloonController:inflateBalloon()
+						end
+					end))
+				end
+
+				local tpTick, tpToggle, oldy = tick(), true
+
 				Fly:Clean(runService.PreSimulation:Connect(function(dt)
 					if entitylib.isAlive and not (vape.Modules.InfiniteFly or {}).Enabled and isnetworkowner(entitylib.character.RootPart) then
-						local flyAllowed = (lplr.Character:GetAttribute('InflatedBalloons') and lplr.Character:GetAttribute('InflatedBalloons') > 0) or store.matchState == 2
-						local mass = (-0.02 + (flyAllowed and 6 or 0) * (tick() % 0.4 < 0.2 and -1 or 1)) + ((up + down) * VerticalValue.Value)
 						local root, moveDirection = entitylib.character.RootPart, entitylib.character.Humanoid.MoveDirection
-						local velo = getSpeed()
-						local destination = (moveDirection * math.max(Value.Value - velo, 0) * dt)
 						rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera, AntiFallPart}
 						rayCheck.CollisionGroup = root.CollisionGroup
 
-						if WallCheck.Enabled then
-							local ray = workspace:Raycast(root.Position, destination, rayCheck)
-							if ray then
-								destination = ((ray.Position + ray.Normal) - root.Position)
-							end
-						end
+						if FlyMode.Value == 'Balloon' then
+							local flyAllowed = (lplr.Character:GetAttribute('InflatedBalloons') and lplr.Character:GetAttribute('InflatedBalloons') > 0) or store.matchState == 2
+							local mass = (-0.02 + (flyAllowed and 6 or 0) * (tick() % 0.4 < 0.2 and -1 or 1)) + ((up + down) * VerticalValue.Value)
+							local velo = getSpeed()
+							local destination = (moveDirection * math.max(Value.Value - velo, 0) * dt)
 
-						if not flyAllowed then
-							if tpToggle then
-								local airleft = (tick() - entitylib.character.AirTime)
-								if airleft > 2 then
-									if not oldy then
-										local ray = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayCheck)
-										if ray and TP.Enabled then
-											tpToggle = false
-											oldy = root.Position.Y
-											tpTick = tick() + 0.11
-											root.CFrame = CFrame.lookAlong(Vector3.new(root.Position.X, ray.Position.Y + entitylib.character.HipHeight, root.Position.Z), root.CFrame.LookVector)
+							if WallCheck.Enabled then
+								local ray = workspace:Raycast(root.Position, destination, rayCheck)
+								if ray then
+									destination = ((ray.Position + ray.Normal) - root.Position)
+								end
+							end
+
+							if not flyAllowed then
+								if tpToggle then
+									local airleft = (tick() - entitylib.character.AirTime)
+									if airleft > 2 then
+										if not oldy then
+											local ray = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayCheck)
+											if ray and TP.Enabled then
+												tpToggle = false
+												oldy = root.Position.Y
+												tpTick = tick() + 0.11
+												root.CFrame = CFrame.lookAlong(Vector3.new(root.Position.X, ray.Position.Y + entitylib.character.HipHeight, root.Position.Z), root.CFrame.LookVector)
+											end
+										end
+									end
+								else
+									if oldy then
+										if tpTick < tick() then
+											local newpos = Vector3.new(root.Position.X, oldy, root.Position.Z)
+											root.CFrame = CFrame.lookAlong(newpos, root.CFrame.LookVector)
+											tpToggle = true
+											oldy = nil
+										else
+											mass = 0
 										end
 									end
 								end
-							else
-								if oldy then
-									if tpTick < tick() then
-										local newpos = Vector3.new(root.Position.X, oldy, root.Position.Z)
-										root.CFrame = CFrame.lookAlong(newpos, root.CFrame.LookVector)
-										tpToggle = true
-										oldy = nil
-									else
-										mass = 0
-									end
+							end
+
+							root.CFrame += destination
+							root.AssemblyLinearVelocity = (moveDirection * velo) + Vector3.new(0, mass, 0)
+
+						elseif FlyMode.Value == 'Vanilla' then
+							local velo = getSpeed()
+							local destination = (moveDirection * math.max(Value.Value - velo, 0) * dt)
+
+							if WallCheck.Enabled then
+								local ray = workspace:Raycast(root.Position, destination, rayCheck)
+								if ray then
+									destination = ((ray.Position + ray.Normal) - root.Position)
 								end
 							end
-						end
 
-						root.CFrame += destination
-						root.AssemblyLinearVelocity = (moveDirection * velo) + Vector3.new(0, mass, 0)
+							local verticalVelo = (up + down) * VerticalValue.Value
+
+							root.CFrame += destination
+							root.AssemblyLinearVelocity = Vector3.new(moveDirection.X * velo, verticalVelo, moveDirection.Z * velo)
+
+						elseif FlyMode.Value == 'CFrame' then
+							local velo = Value.Value
+							local verticalVelo = (up + down) * VerticalValue.Value
+							local moveCF = CFrame.new(Vector3.zero, Vector3.new(moveDirection.X, 0, moveDirection.Z).Unit)
+
+							if moveDirection.Magnitude > 0 then
+								local dest = moveCF.LookVector * velo * dt
+								if WallCheck.Enabled then
+									local ray = workspace:Raycast(root.Position, dest, rayCheck)
+									if ray then
+										dest = (ray.Position + ray.Normal) - root.Position
+									end
+								end
+								root.CFrame += dest
+							end
+
+							root.CFrame += Vector3.new(0, verticalVelo * dt, 0)
+							root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						end
 					end
 				end))
 				Fly:Clean(inputService.InputBegan:Connect(function(input)
@@ -3442,18 +3485,31 @@ run(function()
 					end)
 				end
 			else
-				bedwars.BalloonController.deflateBalloon = old
-				if PopBalloons.Enabled and entitylib.isAlive and (lplr.Character:GetAttribute('InflatedBalloons') or 0) > 0 then
-					for _ = 1, 3 do
-						bedwars.BalloonController:deflateBalloon()
+				if FlyMode.Value == 'Balloon' then
+					bedwars.BalloonController.deflateBalloon = old
+					if PopBalloons.Enabled and entitylib.isAlive and (lplr.Character:GetAttribute('InflatedBalloons') or 0) > 0 then
+						for _ = 1, 3 do
+							bedwars.BalloonController:deflateBalloon()
+						end
 					end
 				end
 			end
 		end,
 		ExtraText = function()
-			return 'Heatseeker'
+			return FlyMode.Value
 		end,
 		Tooltip = 'Makes you go zoom.'
+	})
+	FlyMode = Fly:CreateDropdown({
+		Name = 'Fly Mode',
+		List = {'Balloon', 'Vanilla', 'CFrame'},
+		Function = function(val)
+			PopBalloons.Object.Visible = val == 'Balloon'
+			TP.Object.Visible = val == 'Balloon'
+			PopBalloons.Enabled = val == 'Balloon'
+			TP.Enabled = val == 'Balloon'
+		end,
+		Tooltip = 'Balloon - Uses balloons for legit flight\nVanilla - Physics based flight, no balloons\nCFrame - Direct position manipulation, most stable'
 	})
 	Value = Fly:CreateSlider({
 		Name = 'Speed',
