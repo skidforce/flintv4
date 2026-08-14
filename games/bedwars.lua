@@ -97,137 +97,141 @@ run(function()
 				lastTargets = {}
 				repeat
 					local attacked = {}
-					if getAttackData() then
-						local plrs = entitylib.AllPosition({
-							Range = SwingRange.Value,
-							Wallcheck = Targets.Walls.Enabled or nil,
-							Part = 'RootPart',
-							Players = Targets.Players.Enabled,
-							NPCs = Targets.NPCs.Enabled,
-							Limit = Max.Value + 10
-						})
+					local ok, err = pcall(function()
+						if getAttackData() then
+							local plrs = entitylib.AllPosition({
+								Range = SwingRange.Value,
+								Wallcheck = Targets.Walls.Enabled or nil,
+								Part = 'RootPart',
+								Players = Targets.Players.Enabled,
+								NPCs = Targets.NPCs.Enabled,
+								Limit = Max.Value + 10
+							})
 
-						if #plrs > 0 then
-							local selfpos = entitylib.character.RootPart.Position
-							local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
-							local filtered = {}
+							if #plrs > 0 then
+								local selfpos = entitylib.character.RootPart.Position
+								local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+								local filtered = {}
 
-							for _, v in plrs do
-								local delta = (v.RootPart.Position - selfpos)
-								local angle = math.acos(math.clamp(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit), -1, 1))
-								if angle > (math.rad(AngleSlider.Value) / 2) then continue end
-								table.insert(filtered, v)
-							end
+								for _, v in plrs do
+									local delta = (v.RootPart.Position - selfpos)
+									local angle = math.acos(math.clamp(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit), -1, 1))
+									if angle > (math.rad(AngleSlider.Value) / 2) then continue end
+									table.insert(filtered, v)
+								end
 
-							filtered = sortTargets(filtered, SortMode.Value)
-							for i = 1, math.min(#filtered, Max.Value) do
-								local v = filtered[i]
-								local delta = (v.RootPart.Position - selfpos)
+								filtered = sortTargets(filtered, SortMode.Value)
+								for i = 1, math.min(#filtered, Max.Value) do
+									local v = filtered[i]
+									local delta = (v.RootPart.Position - selfpos)
+									table.insert(attacked, {
+										Entity = v,
+										Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
+									})
+									targetinfo.Targets[v] = tick() + 1
+								end
 
-								table.insert(attacked, {
-									Entity = v,
-									Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
-								})
-								targetinfo.Targets[v] = tick() + 1
-							end
+								if #attacked > 0 then
+									local swingCount = MultiSwing.Enabled and math.min(#attacked, 3) or 1
 
-						if #attacked > 0 then
-							local attackCount = Silent.Enabled and #attacked or 1
-							local swingCount = MultiSwing.Enabled and math.min(#attacked, 3) or 1
+									for swing = 1, swingCount do
+										if AttackDelay < tick() then
+											local cpsValue = CPS.GetRandomValue()
+											AttackDelay = tick() + (1 / cpsValue) + (math.random(-10, 10) / 1000)
 
-							for swing = 1, swingCount do
-								if AttackDelay < tick() then
-									local cpsValue = CPS.GetRandomValue()
-									local baseDelay = 1 / cpsValue
-									AttackDelay = tick() + baseDelay + (math.random(-10, 10) / 1000)
+											if BypassMode.Value == 'Random Delay' then
+												AttackDelay = AttackDelay + (math.random(0, 15) / 1000)
+											end
 
-									if BypassMode.Value == 'Random Delay' then
-										AttackDelay = AttackDelay + (math.random(0, 15) / 1000)
-									end
+											if Silent.Enabled and attacked[swing] then
+												local target = attacked[swing].Entity
+												local targetPos = target.RootPart.Position
+												local oldCF = entitylib.character.RootPart.CFrame
 
-									if Silent.Enabled and attacked[swing] then
-										local target = attacked[swing].Entity
-										local targetPos = target.RootPart.Position
-										local lookDir = (targetPos - selfpos).Unit
-										local oldCF = entitylib.character.RootPart.CFrame
+												local jitterX, jitterZ = 0, 0
+												if BypassMode.Value == 'CFrame Jitter' then
+													local j = JitterAmount.Value
+													jitterX = math.random(-j * 100, j * 100) / 100
+													jitterZ = math.random(-j * 100, j * 100) / 100
+												end
 
-										local jitterOffset = Vector3.zero
-										if BypassMode.Value == 'CFrame Jitter' then
-											local j = JitterAmount.Value
-											jitterOffset = Vector3.new(
-												math.random(-j * 100, j * 100) / 100,
-												0,
-												math.random(-j * 100, j * 100) / 100
-											)
-										end
-
-										local aimPos = selfpos + jitterOffset
-										entitylib.character.RootPart.CFrame = CFrame.lookAt(aimPos, Vector3.new(targetPos.X + jitterOffset.X, aimPos.Y, targetPos.Z + jitterOffset.Z))
-										bedwars.SwordController:swingSwordAtMouse()
-										entitylib.character.RootPart.CFrame = oldCF
-									else
-										if BypassMode.Value == 'CFrame Jitter' then
-											local j = JitterAmount.Value
-											local oldCF = entitylib.character.RootPart.CFrame
-											local offset = CFrame.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
-											entitylib.character.RootPart.CFrame = oldCF * offset
-											bedwars.SwordController:swingSwordAtMouse()
-											entitylib.character.RootPart.CFrame = oldCF
-										else
-											bedwars.SwordController:swingSwordAtMouse()
+												local aimPos = entitylib.character.RootPart.Position + Vector3.new(jitterX, 0, jitterZ)
+												entitylib.character.RootPart.CFrame = CFrame.lookAt(aimPos, Vector3.new(targetPos.X + jitterX, aimPos.Y, targetPos.Z + jitterZ))
+												bedwars.SwordController:swingSwordAtMouse()
+												entitylib.character.RootPart.CFrame = oldCF
+											else
+												if BypassMode.Value == 'CFrame Jitter' then
+													local j = JitterAmount.Value
+													local oldCF = entitylib.character.RootPart.CFrame
+													entitylib.character.RootPart.CFrame = oldCF * CFrame.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
+													bedwars.SwordController:swingSwordAtMouse()
+													entitylib.character.RootPart.CFrame = oldCF
+												else
+													bedwars.SwordController:swingSwordAtMouse()
+												end
+											end
 										end
 									end
 								end
+
+								for _, data in attacked do
+									lastTargets[data.Entity] = tick()
+								end
 							end
 						end
+					end)
+					if not ok then warn('[flintv4] killaura attack: '..tostring(err)) end
 
-							for _, data in attacked do
-								lastTargets[data.Entity] = tick()
+					pcall(function()
+						for i, v in Boxes do
+							if attacked[i] and attacked[i].Entity and attacked[i].Entity.RootPart then
+								v.Adornee = attacked[i].Entity.RootPart
+								v.Color3 = BoxSwingColor.Object.Value
+								v.Transparency = 0.5
+							else
+								v.Adornee = nil
 							end
 						end
-					end
+					end)
 
-					for i, v in Boxes do
-						v.Adornee = attacked[i] and attacked[i].Entity.RootPart or nil
-						if v.Adornee then
-							v.Color3 = Color3.fromHSV(attacked[i].Check.Hue, attacked[i].Check.Sat, attacked[i].Check.Value)
-							v.Transparency = 1 - attacked[i].Check.Opacity
+					pcall(function()
+						for i, v in Particles do
+							local em = getEmitter(v)
+							if em then
+								em.Enabled = attacked[i] ~= nil
+								if attacked[i] and attacked[i].Entity and attacked[i].Entity.RootPart then
+									v.Position = attacked[i].Entity.RootPart.Position
+								else
+									v.Position = Vector3.new(9e9, 9e9, 9e9)
+								end
+							end
 						end
-					end
+					end)
 
-					for i, v in Particles do
-						local pos = attacked[i] and attacked[i].Entity.RootPart.Position or Vector3.new(9e9, 9e9, 9e9)
-						v.Position = pos
-						local em = getEmitter(v)
-						if em then em.Parent = attacked[i] and gameCamera or nil end
-					end
+					pcall(function()
+						if not Silent.Enabled and Face.Enabled and attacked[1] then
+							local targetPos = attacked[1].Entity.RootPart.Position
+							local currentCF = entitylib.character.RootPart.CFrame
+							local targetLook = CFrame.lookAt(currentCF.Position, Vector3.new(targetPos.X, currentCF.Position.Y + 0.01, targetPos.Z))
 
-					if not Silent.Enabled and Face.Enabled and attacked[1] then
-						local targetPos = attacked[1].Entity.RootPart.Position
-						local currentCF = entitylib.character.RootPart.CFrame
-						local targetLook = CFrame.lookAt(currentCF.Position, Vector3.new(targetPos.X, currentCF.Position.Y + 0.01, targetPos.Z))
-
-						if SmoothRotation.Enabled then
-							rotateAngle = rotateAngle + (1 / 6)
-							local alpha = math.clamp(rotateAngle, 0, 1)
-							entitylib.character.RootPart.CFrame = currentCF:Lerp(targetLook, alpha)
-						else
-							entitylib.character.RootPart.CFrame = targetLook
+							if SmoothRotation.Enabled then
+								rotateAngle = rotateAngle + (1 / 6)
+								local alpha = math.clamp(rotateAngle, 0, 1)
+								entitylib.character.RootPart.CFrame = currentCF:Lerp(targetLook, alpha)
+							else
+								entitylib.character.RootPart.CFrame = targetLook
+							end
+						elseif not Face.Enabled then
+							rotateAngle = 0
 						end
-					elseif not Face.Enabled then
-						rotateAngle = 0
-					end
+					end)
 
 					task.wait()
 				until not Killaura.Enabled
 			else
 				lastTargets = {}
-				for _, v in Boxes do
-					v:Destroy()
-				end
-				for _, v in Particles do
-					v:Destroy()
-				end
+				for _, v in Boxes do pcall(function() v:Destroy() end) end
+				for _, v in Particles do pcall(function() v:Destroy() end) end
 				table.clear(Boxes)
 				table.clear(Particles)
 			end
@@ -364,6 +368,7 @@ run(function()
 					part.Transparency = 1
 					part.Parent = gameCamera
 					local emitter = Instance.new('ParticleEmitter')
+					emitter.Enabled = false
 					emitter.Parent = part
 					Particles[i] = part
 				end
