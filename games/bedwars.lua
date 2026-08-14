@@ -1112,12 +1112,22 @@ run(function()
 					if not groundHit then return end
 					local root = entitylib.character.RootPart
 					if trackedFall < -45 then
-						root.Velocity = Vector3.new(0, 2.5, 0)
+						local pos = root.Position
+						local params = RaycastParams.new()
+						params.FilterDescendantsInstances = {lplr.Character, gameCamera}
+						params.RespectCanCollide = true
+						local ray = workspace:Raycast(pos, Vector3.new(0, -50, 0), params)
+						if ray then
+							local groundY = math.round(ray.Position.Y / 3) * 3
+							local groundPos = Vector3.new(math.round(pos.X / 3) * 3, groundY + 3, math.round(pos.Z / 3) * 3)
+							root.CFrame = CFrame.new(groundPos) * (root.CFrame - root.CFrame.Position)
+						end
+						root.AssemblyLinearVelocity = Vector3.new(0, 2.5, 0)
 						entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
 						runService.PreRender:Wait()
 						groundHit:Fire('SendToServer', nil, Vector3.new(0, trackedFall, 0), workspace:GetServerTimeNow())
 					end
-					trackedFall = root.Velocity.Y
+					trackedFall = root.AssemblyLinearVelocity.Y
 				end))
 
 				repeat
