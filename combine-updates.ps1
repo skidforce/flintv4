@@ -48,7 +48,7 @@ Write-Host "  FlintV4 Auto-Combine Script" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # === STEP 1: CLONE UPSTREAM REPOS ===
-Write-Host "[1/8] Cloning upstream repos..." -ForegroundColor Yellow
+Write-Host "[1/9] Cloning upstream repos..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null
 Write-Host "  Cloning Pistonware..." -ForegroundColor Gray
 git clone --quiet $PISTON_REPO (Join-Path $TEMP_DIR "pistonware") 2>&1 | Out-Null
@@ -57,13 +57,13 @@ git clone --quiet $CATV6_REPO (Join-Path $TEMP_DIR "catv6") 2>&1 | Out-Null
 Write-Host "  Done.`n" -ForegroundColor Green
 
 # === STEP 2: PULL LATEST FLINTV4 ===
-Write-Host "[2/8] Pulling latest FlintV4..." -ForegroundColor Yellow
+Write-Host "[2/9] Pulling latest FlintV4..." -ForegroundColor Yellow
 Set-Location $FLINTV4_DIR
 git pull --quiet 2>&1 | Out-Null
 Write-Host "  Done.`n" -ForegroundColor Green
 
 # === STEP 3: COPY PISTONWARE BASE FILES ===
-Write-Host "[3/8] Updating Pistonware base files..." -ForegroundColor Yellow
+Write-Host "[3/9] Updating Pistonware base files..." -ForegroundColor Yellow
 foreach ($file in $PISTON_BASE_FILES) {
     $src = Join-Path $TEMP_DIR "pistonware" $file
     $dst = Join-Path $FLINTV4_DIR $file
@@ -75,7 +75,7 @@ foreach ($file in $PISTON_BASE_FILES) {
 Write-Host ""
 
 # === STEP 4: COPY CATV6 EXTRAS ===
-Write-Host "[4/8] Updating CatV6 extras..." -ForegroundColor Yellow
+Write-Host "[4/9] Updating CatV6 extras..." -ForegroundColor Yellow
 foreach ($file in $CATV6_EXTRAS) {
     $src = Join-Path $TEMP_DIR "catv6" $file
     $dst = Join-Path $FLINTV4_DIR $file
@@ -89,7 +89,7 @@ foreach ($file in $CATV6_EXTRAS) {
 Write-Host ""
 
 # === STEP 5: MERGE FOLDERS (skip protected files) ===
-Write-Host "[5/8] Merging folders..." -ForegroundColor Yellow
+Write-Host "[5/9] Merging folders..." -ForegroundColor Yellow
 foreach ($folder in $MERGE_FOLDERS) {
     $pistonDir = Join-Path $TEMP_DIR "pistonware" $folder
     $catv6Dir  = Join-Path $TEMP_DIR "catv6" $folder
@@ -130,7 +130,7 @@ foreach ($folder in $MERGE_FOLDERS) {
 Write-Host ""
 
 # === STEP 6: REBRAND ALL REFERENCES ===
-Write-Host "[6/8] Rebranding references..." -ForegroundColor Yellow
+Write-Host "[6/9] Rebranding references..." -ForegroundColor Yellow
 if (-not $DryRun) {
     $luaFiles = Get-ChildItem $FLINTV4_DIR -Recurse -Include "*.lua" | Where-Object { $_.FullName -notlike "*\.git*" }
     $rebrandCount = 0
@@ -186,7 +186,7 @@ if (-not $DryRun) {
 Write-Host ""
 
 # === STEP 7: REMOVE KEY SYSTEMS FROM GAME SCRIPTS ===
-Write-Host "[7/8] Removing key systems from game scripts..." -ForegroundColor Yellow
+Write-Host "[7/9] Removing key systems from game scripts..." -ForegroundColor Yellow
 if (-not $DryRun) {
     $gameFiles = Get-ChildItem (Join-Path $FLINTV4_DIR "games") -Include "*.lua" -Recurse
     $keyRemoved = 0
@@ -228,8 +228,19 @@ if (-not $DryRun) {
 }
 Write-Host ""
 
-# === STEP 8: COMMIT & PUSH ===
-Write-Host "[8/8] Committing and pushing..." -ForegroundColor Yellow
+# === STEP 8: BUMP VERSION ===
+Write-Host "[8/9] Bumping version..." -ForegroundColor Yellow
+if (-not $DryRun) {
+    $version = Get-Date -Format "yyyyMMdd.HHmmss"
+    Set-Content (Join-Path $FLINTV4_DIR "version.txt") $version -NoNewline
+    Write-Host "  Version: $version" -ForegroundColor Gray
+} else {
+    Write-Host "  [DRY] Would bump version" -ForegroundColor Gray
+}
+Write-Host ""
+
+# === STEP 9: COMMIT & PUSH ===
+Write-Host "[9/9] Committing and pushing..." -ForegroundColor Yellow
 Set-Location $FLINTV4_DIR
 git add -A
 $changes = git diff --cached --stat

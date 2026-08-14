@@ -27,6 +27,43 @@ local cloneref = cloneref or function(obj)
 end
 local playersService = cloneref(game:GetService('Players'))
 
+-- Version check: compare local version with remote, delete stale cache files if updated
+local function checkForUpdates()
+	local localVersion = ''
+	if isfile('flintv4/version.txt') then
+		pcall(function() localVersion = readfile('flintv4/version.txt') end)
+	end
+
+	local remoteVersion = ''
+	local suc, res = pcall(function()
+		return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/version.txt', true)
+	end)
+	if suc and res and res ~= '' and res ~= '404: Not Found' then
+		remoteVersion = res:gsub('%s+', '')
+	end
+
+	if remoteVersion ~= '' and remoteVersion ~= localVersion then
+		warn('[flintv4] Update detected ('..(localVersion ~= '' and localVersion or 'none')..' -> '..remoteVersion..')')
+		-- Delete stale cached game scripts and bedwars.lua so they get re-downloaded
+		local staleFiles = {
+			'flintv4/games/bedwars.lua',
+		}
+		-- Also delete all cached game scripts for this game
+		for _, placeId in {'6872274481', '6872265039', '8560631822', '8444591321'} do
+			table.insert(staleFiles, 'flintv4/games/'..placeId..'.lua')
+		end
+		for _, path in staleFiles do
+			if isfile(path) then
+				pcall(delfile, path)
+			end
+		end
+		-- Update local version
+		pcall(writefile, 'flintv4/version.txt', remoteVersion)
+		warn('[flintv4] Cache cleared, files will re-download')
+	end
+end
+pcall(checkForUpdates)
+
 -- isfile is not the question. A zero-byte file reads back as PRESENT through every executor's
 -- real isfile, and only the fallback above treats empty as absent -- so on executors that ship
 -- one (most of them), an interrupted write leaves a truncated file that nothing ever repairs.
