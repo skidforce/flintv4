@@ -1668,12 +1668,13 @@ run(function()
 	local AnimSpeed
 	local AnimIntensity
 	local OnlyOnAttack
+	local ViewMode
 	local oldSwing
-	local oldC1
-	local playing = false
-	local connections = {}
+	local animToken = 0
+	local bases = {}
+	local running = false
 
-	local function getWrist()
+	local function getViewmodelWrist()
 		local vm = gameCamera:FindFirstChild('Viewmodel')
 		if vm and vm:FindFirstChild('RightHand') then
 			return vm.RightHand:FindFirstChild('RightWrist')
@@ -1681,67 +1682,100 @@ run(function()
 		return nil
 	end
 
-	local function lerp(a, b, t)
-		return a + (b - a) * math.clamp(t, 0, 1)
+	local function getCharacterWrist()
+		local char = lplr.Character
+		if char then
+			local hand = char:FindFirstChild('RightHand')
+			if hand then
+				return hand:FindFirstChild('RightWrist')
+			end
+		end
+		return nil
 	end
 
-	local function lerpC1(base, target, t)
-		return base:Lerp(target, math.clamp(t, 0, 1))
+	local function getTargets()
+		local targets = {}
+		local mode = ViewMode and ViewMode.Value or 'Viewmodel'
+		if mode ~= 'Character' then
+			local wrist = getViewmodelWrist()
+			if wrist then targets[wrist] = true end
+		end
+		if mode ~= 'Viewmodel' then
+			local wrist = getCharacterWrist()
+			if wrist then targets[wrist] = true end
+		end
+		return targets
 	end
 
 	local function playAnimation(style, speed, intensity)
-		local wrist = getWrist()
-		if not wrist then return end
-		if not oldC1 then oldC1 = wrist.C1 end
-		playing = true
+		local targets = getTargets()
+		local count = 0
+		for _ in targets do count += 1 end
+		if count == 0 then return end
+		bases = {}
+		for wrist in targets do
+			bases[wrist] = wrist.C1
+		end
+		local token = animToken + 1
+		animToken = token
+		running = true
+		local function isActive()
+			return running and SwordAnims.Enabled and token == animToken
+		end
+		local function applyCF(cf)
+			for wrist, base in bases do
+				pcall(function()
+					wrist.C1 = base * cf
+				end)
+			end
+		end
 
 		if style == 'BlockHit' then
 			task.spawn(function()
 				local t = 0
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local dt = task.wait()
 					t = t + dt * speed * 10
 					local phase = (math.sin(t) + 1) / 2
-					local blockCF = oldC1 * CFrame.Angles(0, 0, math.rad(90 * intensity))
-					local slashCF = oldC1 * CFrame.Angles(math.rad(-60 * intensity), 0, math.rad(-30 * intensity))
-					wrist.C1 = lerpC1(slashCF, blockCF, phase)
+					local slash = CFrame.Angles(math.rad(-60 * intensity), 0, math.rad(-30 * intensity))
+					local block = CFrame.Angles(0, 0, math.rad(90 * intensity))
+					applyCF(slash:Lerp(block, phase))
 				end
 			end)
 
 		elseif style == 'Spam' then
 			task.spawn(function()
 				local t = 0
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local dt = task.wait()
 					t = t + dt * speed * 15
 					local rx = math.sin(t * 1.3) * 40 * intensity
 					local ry = math.cos(t * 0.9) * 25 * intensity
 					local rz = math.sin(t * 2.1) * 35 * intensity
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz)))
 				end
 			end)
 
 		elseif style == 'Smooth' then
 			task.spawn(function()
 				local t = 0
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local dt = task.wait()
 					t = t + dt * speed * 4
 					local swing = math.sin(t) * intensity
 					local rx = swing * 70
 					local rz = math.cos(t * 0.5) * 20 * intensity
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), 0, math.rad(rz))
+					applyCF(CFrame.Angles(math.rad(rx), 0, math.rad(rz)))
 				end
 			end)
 
 		elseif style == 'Snap' then
 			task.spawn(function()
-				while playing and SwordAnims.Enabled do
-					local snapCF = oldC1 * CFrame.Angles(math.rad(-80 * intensity), 0, math.rad(40 * intensity))
-					wrist.C1 = snapCF
+				while isActive() do
+					applyCF(CFrame.Angles(math.rad(-80 * intensity), 0, math.rad(40 * intensity)))
 					task.wait(0.05 / speed)
-					if not playing then break end
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(30 * intensity), 0, math.rad(-20 * intensity))
+					if not isActive() then break end
+					applyCF(CFrame.Angles(math.rad(30 * intensity), 0, math.rad(-20 * intensity)))
 					task.wait(0.08 / speed)
 				end
 			end)
@@ -1749,23 +1783,23 @@ run(function()
 		elseif style == 'Circular' then
 			task.spawn(function()
 				local t = 0
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local dt = task.wait()
 					t = t + dt * speed * 6
 					local rx = math.cos(t) * 45 * intensity
 					local ry = math.sin(t) * 30 * intensity
 					local rz = math.sin(t * 0.7) * 20 * intensity
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz)))
 				end
 			end)
 
 		elseif style == 'Jitter' then
 			task.spawn(function()
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local rx = (math.random() - 0.5) * 30 * intensity
 					local ry = (math.random() - 0.5) * 20 * intensity
 					local rz = (math.random() - 0.5) * 25 * intensity
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz)))
 					task.wait(math.random(1, 3) / (speed * 60))
 				end
 			end)
@@ -1773,24 +1807,91 @@ run(function()
 		elseif style == 'Vertical' then
 			task.spawn(function()
 				local t = 0
-				while playing and SwordAnims.Enabled do
+				while isActive() do
 					local dt = task.wait()
 					t = t + dt * speed * 5
 					local phase = math.sin(t)
 					local rx = phase * 80 * intensity
 					local rz = math.abs(phase) * -30 * intensity
-					wrist.C1 = oldC1 * CFrame.Angles(math.rad(rx), 0, math.rad(rz))
+					applyCF(CFrame.Angles(math.rad(rx), 0, math.rad(rz)))
+				end
+			end)
+
+		elseif style == 'Spin' then
+			task.spawn(function()
+				local t = 0
+				while isActive() do
+					local dt = task.wait()
+					t = t + dt * speed * 8
+					local rx = math.sin(t * 2) * 25 * intensity
+					local ry = (t % (math.pi * 2)) * intensity
+					local rz = math.cos(t) * 15 * intensity
+					applyCF(CFrame.Angles(math.rad(rx), ry, math.rad(rz)))
+				end
+			end)
+
+		elseif style == 'FigureEight' then
+			task.spawn(function()
+				local t = 0
+				while isActive() do
+					local dt = task.wait()
+					t = t + dt * speed * 5
+					local rx = math.sin(t) * 55 * intensity
+					local ry = math.sin(t * 2) * 35 * intensity
+					local rz = math.cos(t) * 20 * intensity
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz)))
+				end
+			end)
+
+		elseif style == 'Diagonal' then
+			task.spawn(function()
+				local t = 0
+				while isActive() do
+					local dt = task.wait()
+					t = t + dt * speed * 5
+					local phase = math.sin(t)
+					local rx = phase * 70 * intensity
+					local ry = math.abs(math.cos(t)) * 45 * intensity
+					local rz = phase * 30 * intensity
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz)))
+				end
+			end)
+
+		elseif style == 'Twirl' then
+			task.spawn(function()
+				local t = 0
+				while isActive() do
+					local dt = task.wait()
+					t = t + dt * speed * 10
+					local rz = math.sin(t) * 180 * intensity
+					local rx = math.cos(t * 1.5) * 20 * intensity
+					applyCF(CFrame.Angles(math.rad(rx), 0, math.rad(rz)))
+				end
+			end)
+
+		elseif style == 'Windmill' then
+			task.spawn(function()
+				local t = 0
+				while isActive() do
+					local dt = task.wait()
+					t = t + dt * speed * 6
+					local rx = math.cos(t) * 120 * intensity
+					local ry = math.sin(t) * 40 * intensity
+					applyCF(CFrame.Angles(math.rad(rx), math.rad(ry), 0))
 				end
 			end)
 		end
 	end
 
 	local function stopAnimation()
-		playing = false
-		local wrist = getWrist()
-		if wrist and oldC1 then
-			wrist.C1 = oldC1
+		running = false
+		animToken += 1
+		for wrist, base in bases do
+			pcall(function()
+				wrist.C1 = base
+			end)
 		end
+		bases = {}
 	end
 
 	SwordAnims = vape.Categories.Combat:CreateModule({
@@ -1811,13 +1912,13 @@ run(function()
 				stopAnimation()
 			end
 		end,
-		Tooltip = 'Custom viewmodel sword animations\nwith 7 different styles'
+		Tooltip = 'Custom sword animations\nwith 12 different styles'
 	})
 	AnimStyle = SwordAnims:CreateDropdown({
 		Name = 'Animation style',
-		List = {'BlockHit', 'Spam', 'Smooth', 'Snap', 'Circular', 'Jitter', 'Vertical'},
+		List = {'BlockHit', 'Spam', 'Smooth', 'Snap', 'Circular', 'Jitter', 'Vertical', 'Spin', 'FigureEight', 'Diagonal', 'Twirl', 'Windmill'},
 		Default = 'BlockHit',
-		Tooltip = 'BlockHit: block-slash alternation\nSpam: rapid random rotations\nSmooth: interpolated swing arc\nSnap: instant snap between poses\nCircular: continuous orbital motion\nJitter: small random offsets\nVertical: overhead chopping motion'
+		Tooltip = 'BlockHit: block-slash alternation\nSpam: rapid random rotations\nSmooth: interpolated swing arc\nSnap: instant snap between poses\nCircular: continuous orbital motion\nJitter: small random offsets\nVertical: overhead chopping motion\nSpin: full wrist spin\nFigureEight: figure-eight motion\nDiagonal: angled slash\nTwirl: fast wrist twirl\nWindmill: large overhead windmill'
 	})
 	AnimSpeed = SwordAnims:CreateSlider({
 		Name = 'Animation speed',
@@ -1832,6 +1933,12 @@ run(function()
 		Max = 2,
 		Default = 1,
 		Decimal = 10
+	})
+	ViewMode = SwordAnims:CreateDropdown({
+		Name = 'View mode',
+		List = {'Viewmodel', 'Character', 'Both'},
+		Default = 'Viewmodel',
+		Tooltip = 'Viewmodel: first-person viewmodel\nCharacter: your 3rd person character rig\nBoth: animate both at once'
 	})
 	OnlyOnAttack = SwordAnims:CreateToggle({
 		Name = 'Only on attack',
