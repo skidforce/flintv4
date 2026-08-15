@@ -7546,7 +7546,530 @@ run(function()
 			keys[keybutton] = nil
 		end
 	
-		at 60fps that's hundreds of instance calls a frame.
+		local key = Instance.new('Frame')
+		key.Size = keybutton == Enum.KeyCode.Space and UDim2.new(0, 110, 0, 24) or UDim2.new(0, 34, 0, 36)
+		key.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+		key.BackgroundTransparency = 1 - Color.Opacity
+		key.Position = pos
+		key.Name = keybutton.Name
+		key.Parent = holder
+		local keytext = Instance.new('TextLabel')
+		keytext.BackgroundTransparency = 1
+		keytext.Size = UDim2.fromScale(1, 1)
+		keytext.Font = Enum.Font.Gotham
+		keytext.Text = text or keybutton.Name
+		keytext.TextXAlignment = Enum.TextXAlignment.Left
+		keytext.TextYAlignment = Enum.TextYAlignment.Top
+		keytext.Position = pos2
+		keytext.TextSize = keybutton == Enum.KeyCode.Space and 18 or 15
+		keytext.TextColor3 = Color3.new(1, 1, 1)
+		keytext.Parent = key
+		local corner = Instance.new('UICorner')
+		corner.CornerRadius = UDim.new(0, 4)
+		corner.Parent = key
+	
+		keys[keybutton] = {Key = key}
+	end
+	
+	local function updateKey(inputType)
+		local key = keys[inputType.KeyCode]
+		if key then
+			if key.Tween then
+				key.Tween:Cancel()
+			end
+	
+			if key.Tween2 then
+				key.Tween2:Cancel()
+			end
+	
+			local pressed = inputType.UserInputState == Enum.UserInputState.Begin
+			key.Pressed = pressed
+			key.Tween = tweenService:Create(key.Key, TweenInfo.new(0.1), {
+				BackgroundColor3 = pressed and Color3.new(1, 1, 1) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value),
+				BackgroundTransparency = pressed and 0 or 1 - Color.Opacity
+			})
+			key.Tween2 = tweenService:Create(key.Key.TextLabel, TweenInfo.new(0.1), {
+				TextColor3 = pressed and Color3.new() or Color3.new(1, 1, 1)
+			})
+			key.Tween:Play()
+			key.Tween2:Play()
+		end
+	end
+	
+	Keystrokes = vape.Legit:CreateModule({
+		Name = 'Keystrokes',
+		Function = function(callback)
+			if callback then
+				createKeystroke(Enum.KeyCode.W, UDim2.new(0, 38, 0, 0), UDim2.new(0, 6, 0, 5), Style.Value == 'Arrow' and '↑' or nil)
+				createKeystroke(Enum.KeyCode.S, UDim2.new(0, 38, 0, 42), UDim2.new(0, 8, 0, 5), Style.Value == 'Arrow' and '↓' or nil)
+				createKeystroke(Enum.KeyCode.A, UDim2.new(0, 0, 0, 42), UDim2.new(0, 7, 0, 5), Style.Value == 'Arrow' and '←' or nil)
+				createKeystroke(Enum.KeyCode.D, UDim2.new(0, 76, 0, 42), UDim2.new(0, 8, 0, 5), Style.Value == 'Arrow' and '→' or nil)
+	
+				Keystrokes:Clean(inputService.InputBegan:Connect(updateKey))
+				Keystrokes:Clean(inputService.InputEnded:Connect(updateKey))
+			end
+		end,
+		Size = UDim2.fromOffset(110, 176),
+		Tooltip = 'Shows movement keys onscreen'
+	})
+	holder = Instance.new('Frame')
+	holder.Size = UDim2.fromScale(1, 1)
+	holder.BackgroundTransparency = 1
+	holder.Parent = Keystrokes.Children
+	Style = Keystrokes:CreateDropdown({
+		Name = 'Key Style',
+		List = {'Keyboard', 'Arrow'},
+		Function = function()
+			if Keystrokes.Enabled then
+				Keystrokes:Toggle()
+				Keystrokes:Toggle()
+			end
+		end
+	})
+	Color = Keystrokes:CreateColorSlider({
+		Name = 'Color',
+		DefaultValue = 0,
+		DefaultOpacity = 0.5,
+		Function = function(hue, sat, val, opacity)
+			for _, v in keys do
+				if not v.Pressed then
+					v.Key.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+					v.Key.BackgroundTransparency = 1 - opacity
+				end
+			end
+		end
+	})
+	Keystrokes:CreateToggle({
+		Name = 'Show Spacebar',
+		Function = function(callback)
+			Keystrokes.Children.Size = UDim2.fromOffset(110, callback and 107 or 78)
+	
+			if callback then
+				createKeystroke(Enum.KeyCode.Space, UDim2.new(0, 0, 0, 83), UDim2.new(0, 25, 0, -10), '______')
+			else
+				keys[Enum.KeyCode.Space].Key:Destroy()
+				keys[Enum.KeyCode.Space] = nil
+			end
+		end,
+		Default = true
+	})
+end)
+	
+run(function()
+	local Memory
+	local label
+	
+	Memory = vape.Legit:CreateModule({
+		Name = 'Memory',
+		Function = function(callback)
+			if callback then
+				repeat
+					label.Text = math.floor(tonumber(game:GetService('Stats'):FindFirstChild('PerformanceStats').Memory:GetValue()))..' MB'
+					task.wait(1)
+				until not Memory.Enabled
+			end
+		end,
+		Size = UDim2.fromOffset(100, 41),
+		Tooltip = 'A label showing the memory currently used by roblox'
+	})
+	Memory:CreateFont({
+		Name = 'Font',
+		Blacklist = 'Gotham',
+		Function = function(val)
+			label.FontFace = val
+		end
+	})
+	Memory:CreateColorSlider({
+		Name = 'Color',
+		DefaultValue = 0,
+		DefaultOpacity = 0.5,
+		Function = function(hue, sat, val, opacity)
+			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+			label.BackgroundTransparency = 1 - opacity
+		end
+	})
+	label = Instance.new('TextLabel')
+	label.Size = UDim2.new(0, 100, 0, 41)
+	label.BackgroundTransparency = 0.5
+	label.TextSize = 15
+	label.Font = Enum.Font.Gotham
+	label.Text = '0 MB'
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.BackgroundColor3 = Color3.new()
+	label.Parent = Memory.Children
+	local corner = Instance.new('UICorner')
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = label
+end)
+	
+run(function()
+	local Ping
+	local label
+	
+	Ping = vape.Legit:CreateModule({
+		Name = 'Ping',
+		Function = function(callback)
+			if callback then
+				repeat
+					label.Text = math.floor(tonumber(game:GetService('Stats'):FindFirstChild('PerformanceStats').Ping:GetValue()))..' ms'
+					task.wait(1)
+				until not Ping.Enabled
+			end
+		end,
+		Size = UDim2.fromOffset(100, 41),
+		Tooltip = 'Shows the current connection speed to the roblox server'
+	})
+	Ping:CreateFont({
+		Name = 'Font',
+		Blacklist = 'Gotham',
+		Function = function(val)
+			label.FontFace = val
+		end
+	})
+	Ping:CreateColorSlider({
+		Name = 'Color',
+		DefaultValue = 0,
+		DefaultOpacity = 0.5,
+		Function = function(hue, sat, val, opacity)
+			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+			label.BackgroundTransparency = 1 - opacity
+		end
+	})
+	label = Instance.new('TextLabel')
+	label.Size = UDim2.new(0, 100, 0, 41)
+	label.BackgroundTransparency = 0.5
+	label.TextSize = 15
+	label.Font = Enum.Font.Gotham
+	label.Text = '0 ms'
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.BackgroundColor3 = Color3.new()
+	label.Parent = Ping.Children
+	local corner = Instance.new('UICorner')
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = label
+end)
+	
+run(function()
+	local SongBeats
+	local List
+	local FOV
+	local FOVValue = {}
+	local Volume
+	local alreadypicked = {}
+	local beattick = tick()
+	local oldfov, songobj, songbpm, songtween
+	
+	local function choosesong()
+		local list = List.ListEnabled
+		if #alreadypicked >= #list then
+			table.clear(alreadypicked)
+		end
+	
+		if #list <= 0 then
+			notif('SongBeats', 'no songs', 10)
+			SongBeats:Toggle()
+			return
+		end
+	
+		local chosensong = list[math.random(1, #list)]
+		if #list > 1 and table.find(alreadypicked, chosensong) then
+			repeat
+				task.wait()
+				chosensong = list[math.random(1, #list)]
+			until not table.find(alreadypicked, chosensong) or not SongBeats.Enabled
+		end
+		if not SongBeats.Enabled then return end
+	
+		local split = chosensong:split('/')
+		if not isfile(split[1]) then
+			notif('SongBeats', 'Missing song ('..split[1]..')', 10)
+			SongBeats:Toggle()
+			return
+		end
+	
+		songobj.SoundId = assetfunction(split[1])
+		repeat
+			task.wait()
+		until songobj.IsLoaded or not SongBeats.Enabled
+	
+		if SongBeats.Enabled then
+			beattick = tick() + (tonumber(split[3]) or 0)
+			songbpm = 60 / (tonumber(split[2]) or 50)
+			songobj:Play()
+		end
+	end
+	
+	SongBeats = vape.Legit:CreateModule({
+		Name = 'Song Beats',
+		Function = function(callback)
+			if callback then
+				songobj = Instance.new('Sound')
+				songobj.Volume = Volume.Value / 100
+				songobj.Parent = workspace
+				oldfov = gameCamera.FieldOfView
+	
+				repeat
+					if not songobj.Playing then
+						choosesong()
+					end
+	
+					if beattick < tick() and SongBeats.Enabled and FOV.Enabled then
+						beattick = tick() + songbpm
+						gameCamera.FieldOfView = oldfov - FOVValue.Value
+						songtween = tweenService:Create(gameCamera, TweenInfo.new(math.min(songbpm, 0.2), Enum.EasingStyle.Linear), {
+							FieldOfView = oldfov
+						})
+						songtween:Play()
+					end
+	
+					task.wait()
+				until not SongBeats.Enabled
+			else
+				if songobj then
+					songobj:Destroy()
+				end
+	
+				if songtween then
+					songtween:Cancel()
+				end
+	
+				if oldfov then
+					gameCamera.FieldOfView = oldfov
+				end
+	
+				table.clear(alreadypicked)
+			end
+		end,
+		Tooltip = 'Built in mp3 player'
+	})
+	List = SongBeats:CreateTextList({
+		Name = 'Songs',
+		Placeholder = 'filepath/bpm/start'
+	})
+	FOV = SongBeats:CreateToggle({
+		Name = 'Beat FOV',
+		Function = function(callback)
+			if FOVValue.Object then
+				FOVValue.Object.Visible = callback
+			end
+	
+			if SongBeats.Enabled then
+				SongBeats:Toggle()
+				SongBeats:Toggle()
+			end
+		end,
+		Default = true
+	})
+	FOVValue = SongBeats:CreateSlider({
+		Name = 'Adjustment',
+		Min = 1,
+		Max = 30,
+		Default = 5,
+		Darker = true
+	})
+	Volume = SongBeats:CreateSlider({
+		Name = 'Volume',
+		Function = function(val)
+			if songobj then
+				songobj.Volume = val / 100
+			end
+		end,
+		Min = 1,
+		Max = 100,
+		Default = 100,
+		Suffix = '%'
+	})
+end)
+	
+run(function()
+	local Speedmeter
+	local label
+	
+	Speedmeter = vape.Legit:CreateModule({
+		Name = 'Speedmeter',
+		Function = function(callback)
+			if callback then
+				repeat
+					local lastpos = entitylib.isAlive and entitylib.character.HumanoidRootPart.Position * Vector3.new(1, 0, 1) or Vector3.zero
+					local dt = task.wait(0.2)
+					local newpos = entitylib.isAlive and entitylib.character.HumanoidRootPart.Position * Vector3.new(1, 0, 1) or Vector3.zero
+					label.Text = math.round(((lastpos - newpos) / dt).Magnitude)..' sps'
+				until not Speedmeter.Enabled
+			end
+		end,
+		Size = UDim2.fromOffset(100, 41),
+		Tooltip = 'A label showing the average velocity in studs'
+	})
+	Speedmeter:CreateFont({
+		Name = 'Font',
+		Blacklist = 'Gotham',
+		Function = function(val)
+			label.FontFace = val
+		end
+	})
+	Speedmeter:CreateColorSlider({
+		Name = 'Color',
+		DefaultValue = 0,
+		DefaultOpacity = 0.5,
+		Function = function(hue, sat, val, opacity)
+			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+			label.BackgroundTransparency = 1 - opacity
+		end
+	})
+	label = Instance.new('TextLabel')
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 0.5
+	label.TextSize = 15
+	label.Font = Enum.Font.Gotham
+	label.Text = '0 sps'
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.BackgroundColor3 = Color3.new()
+	label.Parent = Speedmeter.Children
+	local corner = Instance.new('UICorner')
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = label
+end)
+	
+run(function()
+	local TimeChanger
+	local Value
+	local old
+	
+	TimeChanger = vape.Legit:CreateModule({
+		Name = 'Time Changer',
+		Function = function(callback)
+			if callback then
+				old = lightingService.TimeOfDay
+				lightingService.TimeOfDay = Value.Value..':00:00'
+			else
+				lightingService.TimeOfDay = old
+				old = nil
+			end
+		end,
+		Tooltip = 'Change the time of the current world'
+	})
+	Value = TimeChanger:CreateSlider({
+		Name = 'Time',
+		Min = 0,
+		Max = 24,
+		Default = 12,
+		Function = function(val)
+			if TimeChanger.Enabled then 
+				lightingService.TimeOfDay = val..':00:00'
+			end
+		end
+	})
+end)
+
+run(function()
+    local Transparency
+    local sliders = {}
+    local HideArmor
+    local connection
+
+    local originalTransparency = {}
+
+    local parts = {
+        "Head",
+        "UpperTorso", "LowerTorso",
+        "LeftUpperArm", "LeftLowerArm", "LeftHand",
+        "RightUpperArm", "RightLowerArm", "RightHand",
+        "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+        "RightUpperLeg", "RightLowerLeg", "RightFoot"
+    }
+
+    local function getCharacter()
+        local char = entitylib.character
+        if typeof(char) == "table" then
+            if char.character then
+                char = char.character
+            elseif char.HumanoidRootPart then
+                char = char.HumanoidRootPart.Parent
+            end
+        end
+        return typeof(char) == "Instance" and cloneref(char) or nil
+    end
+
+    local function isArmor(name)
+        local lowered = name:lower()
+        return lowered:find("helmet") or lowered:find("chestplate") or lowered:find("boots")
+    end
+
+    local function setHandleTransparency(handle, value)
+        if handle:IsA("BasePart") then
+            if originalTransparency[handle] == nil then
+                originalTransparency[handle] = handle.Transparency
+            end
+            handle.Transparency = value
+        end
+        for _, child in ipairs(handle:GetDescendants()) do
+            if child:IsA("BasePart") then
+                if originalTransparency[child] == nil then
+                    originalTransparency[child] = child.Transparency
+                end
+                child.Transparency = value
+            end
+        end
+    end
+
+    local function handleArmor(char, transparency)
+        for _, accessory in ipairs(char:GetChildren()) do
+            if accessory:IsA("Accessory") and accessory:FindFirstChild("Handle") then
+                if isArmor(accessory.Name) then
+                    setHandleTransparency(accessory.Handle, transparency)
+                end
+            end
+        end
+    end
+
+    local function setTransparency()
+        if not Transparency.Enabled then return end
+        if not entitylib.isAlive then return end
+
+        local char = getCharacter()
+        if not char then return end
+
+        for partName, slider in pairs(sliders) do
+            local part = char:FindFirstChild(partName)
+            if part then
+                if originalTransparency[part] == nil then
+                    originalTransparency[part] = part.Transparency
+                end
+                part.Transparency = slider.Value
+
+                if partName == "Head" then
+                    local face = part:FindFirstChild("face")
+                    if face and face:IsA("Decal") then
+                        if originalTransparency[face] == nil then
+                            originalTransparency[face] = face.Transparency
+                        end
+                        face.Transparency = slider.Value
+                    end
+                end
+            end
+        end
+
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
+                if obj.Name:lower():find("hair") then
+                    setHandleTransparency(obj.Handle, sliders.Hair.Value)
+                end
+            end
+        end
+
+        if HideArmor.Enabled then
+            handleArmor(char, 1)
+        else
+            handleArmor(char, 0)
+        end
+    end
+
+    Transparency = vape.Categories.Render:CreateModule({
+        Name = 'Transparency',
+        Function = function(callback)
+            if callback then
+                -- Reapplying does full GetChildren/GetDescendants sweeps of the
+                -- character; at 60fps that's hundreds of instance calls a frame.
                 -- 10Hz is visually identical (the game only rarely resets
                 -- transparency) and slider callbacks still apply instantly.
                 local nextApply = 0
@@ -7604,6 +8127,7 @@ run(function()
         Default = false
     })
 end)
+
 
 	run(function()
 		local AnimDisabler

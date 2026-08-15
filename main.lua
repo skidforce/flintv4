@@ -5,7 +5,6 @@
 -- the gate was skipped. Checked before the uninject below, so a failed check cannot tear down a
 -- working instance on its way out.
 if not shared.SkidV5Authenticated then
-	warn('[skidv5] not authenticated -- run the pistonware loader and enter your key')
 	return
 end
 

@@ -6907,6 +6907,7 @@ run(function()
 		return prettify(#members > 1 and family or members[1])
 	end
 	
+	if bedwars.ItemSkinType then
 	for _, skin in bedwars.ItemSkinType do
 		local meta = bedwars.getItemSkinMeta(skin)
 		local item = meta and meta.itemType and bedwars.ItemMeta[meta.itemType]
@@ -6915,6 +6916,7 @@ run(function()
 			skins[meta.itemType][getLabel(meta.itemType, skin)] = skin
 		end
 	end
+end
 	
 	for itemType in skins do
 		local family = getFamily(itemType)
