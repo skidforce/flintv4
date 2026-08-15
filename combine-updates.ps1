@@ -42,6 +42,7 @@ $PROTECTED_FILES = @(
     "games/bedwars.lua",
     "games/6872274481.lua",
     "games/6872265039.lua",
+    "games/132768098780837.lua",
     "libraries/prediction.lua"
 )
 
@@ -137,6 +138,8 @@ if (-not $DryRun) {
     $luaFiles = Get-ChildItem $FLINTV4_DIR -Recurse -Include "*.lua" | Where-Object { $_.FullName -notlike "*\.git*" }
     $rebrandCount = 0
     foreach ($file in $luaFiles) {
+        $relPath = $file.FullName.Substring($FLINTV4_DIR.Length).TrimStart("\", "/").Replace("\", "/")
+        if ($PROTECTED_FILES -contains $relPath) { continue }
         $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $content) { continue }
         $original = $content
@@ -193,6 +196,8 @@ if (-not $DryRun) {
     $gameFiles = Get-ChildItem (Join-Path $FLINTV4_DIR "games") -Include "*.lua" -Recurse
     $keyRemoved = 0
     foreach ($file in $gameFiles) {
+        $relPath = $file.FullName.Substring($FLINTV4_DIR.Length).TrimStart("\", "/").Replace("\", "/")
+        if ($PROTECTED_FILES -contains $relPath) { continue }
         $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $content) { continue }
         $original = $content

@@ -3390,9 +3390,11 @@ run(function()
 	local PopBalloons
 	local TP
 	local FlyMode
+	local Duration
 	local rayCheck = RaycastParams.new()
 	rayCheck.RespectCanCollide = true
 	local up, down, old = 0, 0
+	local heatseekerEnd, heatLabel
 
 	Fly = vape.Categories.Blatant:CreateModule({
 		Name = 'Fly',
@@ -3402,7 +3404,7 @@ run(function()
 			if callback then
 				up, down, old = 0, 0, bedwars.BalloonController.deflateBalloon
 
-				if FlyMode.Value == 'Balloon' then
+				if FlyMode.Value == 'Balloon' or FlyMode.Value == 'Heatseeker' then
 					bedwars.BalloonController.deflateBalloon = function() end
 					if lplr.Character and (lplr.Character:GetAttribute('InflatedBalloons') or 0) == 0 and getItem('balloon') then
 						bedwars.BalloonController:inflateBalloon()
@@ -3416,13 +3418,40 @@ run(function()
 
 				local tpTick, tpToggle, oldy = tick(), true
 
+				if FlyMode.Value == 'Heatseeker' then
+					heatseekerEnd = tick() + Duration.Value
+					if not heatLabel then
+						heatLabel = Instance.new('TextLabel')
+						heatLabel.Size = UDim2.fromOffset(180, 30)
+						heatLabel.Position = UDim2.new(0.5, 0, 0, 64)
+						heatLabel.AnchorPoint = Vector2.new(0.5, 0)
+						heatLabel.BackgroundTransparency = 1
+						heatLabel.TextColor3 = Color3.fromRGB(255, 90, 60)
+						heatLabel.TextSize = 22
+						heatLabel.Font = Enum.Font.ArialBold
+						heatLabel.TextStrokeColor3 = Color3.new()
+						heatLabel.TextStrokeTransparency = 0.15
+						heatLabel.ZIndex = 10
+						heatLabel.Parent = vape.gui
+					else
+						heatLabel.Visible = true
+					end
+				end
+
 				Fly:Clean(runService.PreSimulation:Connect(function(dt)
 					if entitylib.isAlive and not (vape.Modules.InfiniteFly or {}).Enabled and isnetworkowner(entitylib.character.RootPart) then
 						local root, moveDirection = entitylib.character.RootPart, entitylib.character.Humanoid.MoveDirection
 						rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera, AntiFallPart}
 						rayCheck.CollisionGroup = root.CollisionGroup
 
-						if FlyMode.Value == 'Balloon' then
+						if FlyMode.Value == 'Balloon' or FlyMode.Value == 'Heatseeker' then
+							if FlyMode.Value == 'Heatseeker' then
+								if tick() >= heatseekerEnd then
+									Fly:Toggle()
+									return
+								end
+								heatLabel.Text = 'Heatseeker ' .. string.format('%.1f', math.max(heatseekerEnd - tick(), 0))
+							end
 							local flyAllowed = (lplr.Character:GetAttribute('InflatedBalloons') and lplr.Character:GetAttribute('InflatedBalloons') > 0) or store.matchState == 2
 							local mass = (-0.02 + (flyAllowed and 6 or 0) * (tick() % 0.4 < 0.2 and -1 or 1)) + ((up + down) * VerticalValue.Value)
 							local velo = getSpeed()
@@ -3528,12 +3557,15 @@ run(function()
 					end)
 				end
 			else
-				if FlyMode.Value == 'Balloon' then
+				if FlyMode.Value == 'Balloon' or FlyMode.Value == 'Heatseeker' then
 					bedwars.BalloonController.deflateBalloon = old
 					if PopBalloons.Enabled and entitylib.isAlive and (lplr.Character:GetAttribute('InflatedBalloons') or 0) > 0 then
 						for _ = 1, 3 do
 							bedwars.BalloonController:deflateBalloon()
 						end
+					end
+					if FlyMode.Value == 'Heatseeker' and heatLabel then
+						heatLabel.Visible = false
 					end
 				end
 			end
@@ -3545,14 +3577,27 @@ run(function()
 	})
 	FlyMode = Fly:CreateDropdown({
 		Name = 'Fly Mode',
-		List = {'Balloon', 'Vanilla', 'CFrame'},
+		List = {'Balloon', 'Vanilla', 'CFrame', 'Heatseeker'},
 		Function = function(val)
-			PopBalloons.Object.Visible = val == 'Balloon'
-			TP.Object.Visible = val == 'Balloon'
-			PopBalloons.Enabled = val == 'Balloon'
-			TP.Enabled = val == 'Balloon'
+			if Duration then
+				Duration.Object.Visible = val == 'Heatseeker'
+			end
+			PopBalloons.Object.Visible = val == 'Balloon' or val == 'Heatseeker'
+			TP.Object.Visible = val == 'Balloon' or val == 'Heatseeker'
+			PopBalloons.Enabled = val == 'Balloon' or val == 'Heatseeker'
+			TP.Enabled = val == 'Balloon' or val == 'Heatseeker'
+			if val == 'Heatseeker' then
+				if heatLabel then
+					heatLabel.Visible = true
+				end
+				if Fly.Enabled then
+					heatseekerEnd = tick() + Duration.Value
+				end
+			elseif heatLabel then
+				heatLabel.Visible = false
+			end
 		end,
-		Tooltip = 'Balloon - Uses balloons for legit flight\nVanilla - Physics based flight, no balloons\nCFrame - Direct position manipulation, most stable'
+		Tooltip = 'Balloon - Uses balloons for legit flight\nVanilla - Physics based flight, no balloons\nCFrame - Direct position manipulation, most stable\nHeatseeker - CatV6 balloon fly with duration countdown'
 	})
 	Value = Fly:CreateSlider({
 		Name = 'Speed',
@@ -3584,6 +3629,16 @@ run(function()
 		Name = 'TP Down',
 		Default = true
 	})
+	Duration = Fly:CreateSlider({
+		Name = 'Duration',
+		Min = 1,
+		Max = 60,
+		Default = 10,
+		Suffix = function(val)
+			return val == 1 and 'sec' or 'secs'
+		end
+	})
+	Duration.Object.Visible = FlyMode.Value == 'Heatseeker'
 end)
 
 run(function()
