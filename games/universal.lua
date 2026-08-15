@@ -48,6 +48,7 @@ local groupService = cloneref(game:GetService('GroupService'))
 local textChatService = cloneref(game:GetService('TextChatService'))
 local contextService = cloneref(game:GetService('ContextActionService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
+local proxService = cloneref(game:GetService('ProximityPromptService'))
 
 local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
 	return true
@@ -8210,5 +8211,153 @@ run(function()
 			end
 		end,
 		Tooltip = 'Framerate cap applied while the module is on'
+	})
+end)
+
+run(function()
+	local FastProxPrompt
+	local Mode
+	local Value
+	local modified = {}
+	local thread
+
+	FastProxPrompt = vape.Categories.World:CreateModule({
+		Name = 'FastProxPrompt',
+		Function = function(callback)
+			if callback then
+				if Mode.Value == 'Signal' then
+					FastProxPrompt:Clean(proxService.PromptButtonHoldBegan:Connect(function(prompt, plr)
+						if plr == lplr then
+							thread = task.delay(prompt.HoldDuration * (Value.Value / 100), function()
+								fireproximityprompt(prompt)
+								thread = nil
+							end)
+						end
+					end))
+
+					FastProxPrompt:Clean(proxService.PromptButtonHoldEnded:Connect(function(prompt, plr)
+						if plr == lplr and thread then
+							task.cancel(thread)
+							thread = nil
+						end
+					end))
+				else
+					FastProxPrompt:Clean(proxService.PromptShown:Connect(function(prompt)
+						if not modified[prompt] then
+							modified[prompt] = prompt.HoldDuration
+						end
+
+						prompt.HoldDuration = modified[prompt] * (Value.Value / 100)
+					end))
+
+					FastProxPrompt:Clean(proxService.PromptHidden:Connect(function(prompt)
+						if modified[prompt] then
+							prompt.HoldDuration = modified[prompt]
+							modified[prompt] = nil
+						end
+					end))
+				end
+			else
+				if thread then
+					task.cancel(thread)
+					thread = nil
+				end
+
+				for i, v in modified do
+					i.HoldDuration = v
+				end
+
+				table.clear(modified)
+			end
+		end,
+		Tooltip = 'Allow you to adjust the HoldDuration time of a ProximityPrompt'
+	})
+	Mode = FastProxPrompt:CreateDropdown({
+		Name = 'Mode',
+		List = {'Signal', 'Property'},
+		Tooltip = 'Signal - Uses fireproximityprompt after the calculated delay\nProperty - Sets the HoldDuration property',
+		Function = function()
+			if FastProxPrompt.Enabled then
+				FastProxPrompt:Toggle()
+				FastProxPrompt:Toggle()
+			end
+		end
+	})
+	Value = FastProxPrompt:CreateSlider({
+		Name = 'Modifier',
+		Min = 0,
+		Max = 100,
+		Default = 50,
+		Suffix = '%',
+		Function = function(val)
+			for i, v in modified do
+				i.HoldDuration = v * (val / 100)
+			end
+		end
+	})
+end)
+
+run(function()
+	local ZoomUnlocker
+	local MaxZoom
+	local zoomConn
+
+	local FALLBACK_MAX_ZOOM = 14
+
+	local function defaultMaxZoom()
+		local ok, val = pcall(function()
+			return cloneref(game:GetService('StarterPlayer')).CameraMaxZoomDistance
+		end)
+		if ok and type(val) == 'number' and val > 0 then return val end
+		return FALLBACK_MAX_ZOOM
+	end
+
+	local pending = false
+
+	local function applyZoom()
+		pending = false
+		if not (ZoomUnlocker and ZoomUnlocker.Enabled) then return end
+		if lplr.CameraMinZoomDistance >= lplr.CameraMaxZoomDistance then return end
+		if lplr.CameraMaxZoomDistance ~= MaxZoom.Value then
+			lplr.CameraMaxZoomDistance = MaxZoom.Value
+		end
+	end
+
+	local function queueZoom()
+		if pending then return end
+		pending = true
+		task.defer(applyZoom)
+	end
+
+	ZoomUnlocker = vape.Categories.Utility:CreateModule({
+		Name = 'ZoomUnlocker',
+		Function = function(callback)
+			if callback then
+				applyZoom()
+				zoomConn = lplr:GetPropertyChangedSignal('CameraMaxZoomDistance'):Connect(queueZoom)
+			else
+				if zoomConn then
+					pcall(function() zoomConn:Disconnect() end)
+					zoomConn = nil
+				end
+				pending = false
+				lplr.CameraMaxZoomDistance = defaultMaxZoom()
+			end
+		end,
+		Tooltip = 'Removes the camera zoom limit so you can zoom further out'
+	})
+
+	MaxZoom = ZoomUnlocker:CreateSlider({
+		Name = 'Max Zoom Distance',
+		Min = 14,
+		Max = 1000,
+		Default = 100,
+		Suffix = function(v) return v == 1 and 'stud' or 'studs' end,
+		Function = function()
+			if ZoomUnlocker and ZoomUnlocker.Enabled then
+				queueZoom()
+			end
+		end,
+		Tooltip = 'How far out the camera is allowed to go. 14 is the game default'
 	})
 end)

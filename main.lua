@@ -328,10 +328,16 @@ local function finishLoading()
 			-- by hand here. Without it the guard at the top of this file would reject the
 			-- re-injection, and bedwars.lua would be handed to loadstring with no script_key.
 			-- %q so a key containing a quote or backslash still produces a valid chunk.
+			--
+			-- skidv5 has no key gate: the loader sets shared.SkidV5Authenticated directly, and
+			-- the teleport script must re-publish that flag UNCONDITIONALLY -- gating it on
+			-- shared.PistonwareKey (which skidv5 never sets) meant the queued main.lua bailed at
+			-- the auth guard after every teleport and the new game's script never auto-loaded.
 			if shared.PistonwareKey then
 				local quoted = string.format('%q', shared.PistonwareKey)
-				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\nshared.SkidV5Authenticated = true\n'..teleportScript
+				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\n'..teleportScript
 			end
+			teleportScript = 'shared.SkidV5Authenticated = true\n'..teleportScript
 			if shared.SkidV5Developer then
 				teleportScript = 'shared.SkidV5Developer = true\n'..teleportScript
 			end

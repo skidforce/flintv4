@@ -53,6 +53,48 @@ for _, name in {'markKnockback', 'reportHit', 'trackShot', 'expectKnockback'} do
 	prediction[name] = prediction[name] or function() end
 end
 
+run(function()
+	local function isTrainingDummy(ent)
+		return ent:HasTag('trainingRoomDummy') or ent:GetAttribute('TrainingRoomDummy') ~= nil
+	end
+
+	local function customEntity(ent)
+		if ent:HasTag('inventory-entity') and not (ent:HasTag('Monster') or isTrainingDummy(ent)) then
+			return
+		end
+		if entitylib.EntityThreads[ent] or entitylib.getEntity(ent) then
+			return
+		end
+		entitylib.addEntity(ent, nil, function(self)
+			local theirteam = self.Character:GetAttribute('Team')
+			if theirteam == nil then return true end
+			return lplr:GetAttribute('Team') ~= theirteam
+		end)
+	end
+
+	local ENTITY_TAGS = {'entity', 'Monster', 'trainingRoomDummy'}
+
+	local oldstart = entitylib.start
+	entitylib.start = function()
+		oldstart()
+		if entitylib.Running then
+			for _, tag in ENTITY_TAGS do
+				for _, ent in collectionService:GetTagged(tag) do
+					customEntity(ent)
+				end
+				table.insert(entitylib.Connections, collectionService:GetInstanceAddedSignal(tag):Connect(customEntity))
+				table.insert(entitylib.Connections, collectionService:GetInstanceRemovedSignal(tag):Connect(function(ent)
+					entitylib.removeEntity(ent)
+				end))
+			end
+		end
+	end
+
+	if entitylib.Running then
+		entitylib.start()
+	end
+end)
+
 local rankCache = {}
 local store = {
 	attackReach = 0,
@@ -1321,6 +1363,21 @@ run(function()
 
 	OldBreak = bedwars.BlockController.isBlockBreakable
 	OldHit = bedwars.BlockBreaker.hitBlock
+
+	bedwars.BlockController.isBlockBreakable = function(self, breakTable, plr)
+		local obj = bedwars.BlockController:getStore():getBlockAt(breakTable.blockPosition)
+		if obj and obj.Name == 'bed' then
+			if obj:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
+				return false
+			end
+			for _, v in playersService:GetPlayers() do
+				if obj:GetAttribute('Team'..(v:GetAttribute('Team') or 0)..'NoBreak') and not select(2, whitelist:get(v)) then
+					return false
+				end
+			end
+		end
+		return OldBreak(self, breakTable, plr)
+	end
 
 	Client.Get = function(self, remoteName)
 		local call = OldGet(self, remoteName)
@@ -8283,110 +8340,169 @@ end)
 run(function()
 	local AutoToxic
 	local GG
-	local Toggles, Lists, said, dead = {}, {}, {}
-	local Presets = {}
-	
-	local function sendMessage(name, obj, default)
-		local tab = Lists[name].ListEnabled
-		local custommsg = #tab > 0 and tab[math.random(1, #tab)] or default
-		if not custommsg then return end
-		if #tab > 1 and custommsg == said[name] then
-			repeat
-				task.wait()
-				custommsg = tab[math.random(1, #tab)]
-			until custommsg ~= said[name]
-		end
-		said[name] = custommsg
-	
-		custommsg = custommsg and custommsg:gsub('<obj>', obj or '') or ''
-		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			if textChatService:CanUserChatAsync(lplr.UserId) then
-				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(custommsg)
-			else
-				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendPresetAsync(Presets[name] or Presets['So close'])
-			end
-			textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(custommsg)
-		else
-			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(custommsg, 'All')
-		end
+	local Kill
+	local KillMessage
+	local Presets, PresetNames = {}, {}
+
+	local function normalise(str)
+		return (tostring(str):lower():gsub('^%s*(.-)%s*$', '%1'))
 	end
-	
+
+	local function sendChat(message)
+		if not message then return end
+
+		if textChatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
+			replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+			return
+		end
+
+		local presetId = Presets[normalise(message)]
+		if not presetId then return end
+
+		local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
+		if not channel then return end
+
+		task.spawn(function()
+			pcall(function()
+				channel:SendPresetAsync(presetId)
+			end)
+		end)
+	end
+
 	AutoToxic = vape.Categories.Utility:CreateModule({
 		Name = 'AutoToxic',
 		Function = function(callback)
 			if callback then
-				AutoToxic:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
-					if Toggles.BedDestroyed.Enabled and bedTable.brokenBedTeam.id == lplr:GetAttribute('Team') then
-						sendMessage('BedDestroyed', (bedTable.player.DisplayName or bedTable.player.Name), 'how dare you >:( | <obj>')
-					elseif Toggles.Bed.Enabled and bedTable.player.UserId == lplr.UserId then
-						local team = bedwars.QueueMeta[store.queueType].teams[tonumber(bedTable.brokenBedTeam.id)]
-						sendMessage('Bed', team and team.displayName:lower() or 'white', 'nice bed lul | <obj>')
+				AutoToxic:Clean(vapeEvents.MatchEndEvent.Event:Connect(function()
+					if GG.Enabled then
+						sendChat('Good game')
 					end
 				end))
 				AutoToxic:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
-					if deathTable.finalKill then
-						local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
-						local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
-						if not killed or not killer then return end
-						if killed == lplr then
-							if (not dead) and killer ~= lplr and Toggles.Death.Enabled then
-								dead = true
-								sendMessage('Death', (killer.DisplayName or killer.Name), 'my gaming chair subscription expired :( | <obj>')
-							end
-						elseif killer == lplr and Toggles.Kill.Enabled then
-							sendMessage('Kill', (killed.DisplayName or killed.Name), 'vxp on top | <obj>')
-						end
-					end
-				end))
-				AutoToxic:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winstuff)
-					if GG.Enabled then
-						if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-							textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync('gg')
-						else
-							replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('gg', 'All')
-						end
-					end
-	
-					local myTeam = bedwars.Store:getState().Game.myTeam
-					if myTeam and myTeam.id == winstuff.winningTeamId or lplr.Neutral then
-						if Toggles.Win.Enabled then
-							sendMessage('Win', nil, 'yall garbage')
-						end
+					if not Kill.Enabled then return end
+
+					local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
+					local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
+					if not killer or not killed then return end
+					if killer ~= lplr or killed == lplr then return end
+
+					if KillMessage.Value ~= 'None' then
+						sendChat(KillMessage.Value)
 					end
 				end))
 			end
 		end,
-		Tooltip = 'Says a message after a certain action'
+		Tooltip = 'Sends a quick chat message after a certain action'
 	})
 	GG = AutoToxic:CreateToggle({
 		Name = 'AutoGG',
 		Default = true
 	})
-	for _, v in {'Kill', 'Death', 'Bed', 'BedDestroyed', 'Win'} do
-		Toggles[v] = AutoToxic:CreateToggle({
-			Name = v..' ',
-			Function = function(callback)
-				if Lists[v] then
-					Lists[v].Object.Visible = callback
-				end
+	Kill = AutoToxic:CreateToggle({
+		Name = 'Kill',
+		Function = function(callback)
+			if KillMessage then
+				KillMessage.Object.Visible = callback
 			end
-		})
-		Lists[v] = AutoToxic:CreateTextList({
-			Name = v,
-			Darker = true,
-			Visible = false
-		})
+		end
+	})
+	KillMessage = AutoToxic:CreateDropdown({
+		Name = 'Kill Message',
+		List = PresetNames,
+		Darker = true,
+		Visible = false,
+		Tooltip = 'Quick chat message sent after you kill someone'
+	})
+
+	local savedKillMessage
+	local loadDropdown = KillMessage.Load
+	function KillMessage:Load(tab)
+		savedKillMessage = tab.Value
+		loadDropdown(self, tab)
 	end
-	
-	task.spawn(pcall, function()
-		for _, group in textChatService:GetPresetsAsync().categoryGroups do
-			for _, category in group.categories do
-				for _, message in category.messages do
-					Presets[message.value] = message.presetId
+	task.spawn(function()
+		if textChatService.ChatVersion ~= Enum.ChatVersion.TextChatService then return end
+
+		local success, presets = pcall(function()
+			return textChatService:GetPresetsAsync()
+		end)
+		if not success or type(presets) ~= 'table' then return end
+
+		for _, group in presets.categoryGroups or {} do
+			for _, category in group.categories or {} do
+				for _, message in category.messages or {} do
+					Presets[normalise(message.value)] = message.presetId
+					table.insert(PresetNames, message.value)
 				end
 			end
 		end
+
+		table.sort(PresetNames)
+
+		if savedKillMessage and table.find(PresetNames, savedKillMessage) then
+			KillMessage:SetValue(savedKillMessage)
+		elseif KillMessage.Value == 'None' and PresetNames[1] then
+			KillMessage:SetValue(PresetNames[1])
+		end
 	end)
+end)
+
+run(function()
+	local HideNametag
+	local nametagWatch = {}
+	local charConn
+
+	local function clearNametagWatch()
+		for _, c in nametagWatch do
+			pcall(function() c:Disconnect() end)
+		end
+		table.clear(nametagWatch)
+	end
+
+	local function eachNametag(char, fn)
+		if not char then return end
+		for _, v in char:GetDescendants() do
+			if v:IsA('BillboardGui') and v.Name == 'Nametag' then
+				pcall(fn, v)
+			end
+		end
+	end
+
+	local function setNametagEnabled(state, char)
+		clearNametagWatch()
+		char = char or lplr.Character
+		if not char then return end
+
+		eachNametag(char, function(v) v.Enabled = state end)
+		if state then return end
+
+		nametagWatch[#nametagWatch + 1] = char.DescendantAdded:Connect(function(v)
+			if v:IsA('BillboardGui') and v.Name == 'Nametag' then
+				pcall(function() v.Enabled = false end)
+			end
+		end)
+	end
+
+	HideNametag = vape.Categories.Utility:CreateModule({
+		Name = 'HideNametag',
+		Function = function(callback)
+			if callback then
+				setNametagEnabled(false)
+				charConn = lplr.CharacterAdded:Connect(function(char)
+					if HideNametag.Enabled then
+						setNametagEnabled(false, char)
+					end
+				end)
+			else
+				if charConn then
+					pcall(function() charConn:Disconnect() end)
+					charConn = nil
+				end
+				setNametagEnabled(true)
+			end
+		end,
+		Tooltip = 'Hides the nametag above your own character'
+	})
 end)
 
 run(function()
@@ -15943,8 +16059,8 @@ run(function()
 	local HealSpirit
 	local AttackSpirit
 	local TargetItemDrops
-	local Diamond
-	local Emerald
+	local SpiritDelay
+	local Ores
 	
 	local function getAttackData()
 		if Limit.Enabled then
@@ -15963,7 +16079,7 @@ run(function()
 	local function getDrops(localPosition, ItemDrops)
 		local drop, lastmag = nil, Range.Value + 1
 		for i, v in ItemDrops do
-			if v.Name == 'emerald' and Emerald.Enabled or v.Name == 'diamond' and Diamond.Enabled then
+			if table.find(Ores.ListEnabled, v.Name) then
 				local magnitude = (localPosition - v.Position).Magnitude
 				if magnitude <= lastmag and not entitylib.Wallcheck(localPosition, v.Position, {gameCamera, lplr.Character, v}) then
 					drop, lastmag = v, magnitude
@@ -16023,7 +16139,7 @@ run(function()
 										bedwars.AudioManager:playAudio(bedwars.SoundList.SPIRIT_SUMMONER_CHANGE_AFFINITY, {})
 									end
 	
-									task.wait(1.5)
+									task.wait(SpiritDelay.Value)
 								end
 							end
 						end
@@ -16043,6 +16159,14 @@ run(function()
 		Suffix = function(val)
 			return val >= 2 and 'studs' or 'stud'
 		end
+	})
+	SpiritDelay = AutoUma:CreateSlider({
+		Name = 'Spirit delay',
+		Min = 0.1,
+		Max = 3,
+		Decimal = 2,
+		Default = 1.5,
+		Suffix = 'seconds'
 	})
 	Animation = AutoUma:CreateToggle({
 		Name = 'Animation',
@@ -16078,21 +16202,15 @@ run(function()
 		Name = 'Target item drops',
 		Default = true,
 		Function = function(call)
-			if Emerald then
-				Emerald.Object.Visible = call
-				Diamond.Object.Visible = call
+			if Ores then
+				Ores.Object.Visible = call
 			end
 		end
 	})
-	Emerald = AutoUma:CreateToggle({
-		Name = 'Emerald',
+	Ores = AutoUma:CreateTextList({
+		Name = 'Ores',
 		Darker = true,
-		Default = true
-	})
-	Diamond = AutoUma:CreateToggle({
-		Name = 'Diamond',
-		Darker = true,
-		Default = true
+		Default = {'emerald', 'diamond'}
 	})
 end)
 

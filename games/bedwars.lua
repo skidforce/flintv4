@@ -56,6 +56,131 @@ run(function()
 	local Particles, Boxes, AttackDelay = {}, {}, tick()
 	local lastTargets = {}
 	local rotateAngle = 0
+	local Hitreg
+	local AttackRemote = {FireServer = function() end}
+	task.spawn(function()
+		for _ = 1, 10 do
+			local ok, remote = pcall(function()
+				return bedwars.Client:Get(bedwars.SwordController.sendServerRequest).instance
+			end)
+			if ok and remote then
+				AttackRemote = remote
+				return
+			end
+			task.wait(0.5)
+		end
+	end)
+
+	local function getSwingReach()
+		return (bedwars.CombatConstant and bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE) or 14.4
+	end
+
+	local function getAimPos(target)
+		local pos = target.RootPart.Position
+		if BypassMode and BypassMode.Value == 'CFrame Jitter' then
+			local j = JitterAmount.Value
+			pos = pos + Vector3.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
+		end
+		return pos
+	end
+
+	local function canSwingHit(target)
+		if not (target and target.RootPart and target.Character and target.Character:IsDescendantOf(workspace)) then
+			return false
+		end
+		local origin = gameCamera.CFrame.Position
+		local delta = getAimPos(target) - origin
+		local reach = math.min(getSwingReach(), AttackRange.Value)
+		if delta.Magnitude > reach then
+			return false
+		end
+		if Targets and Targets.Walls.Enabled then
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = {lplr.Character, gameCamera}
+			local res = workspace:Raycast(origin, delta.Unit * (delta.Magnitude + 2), params)
+			local hit = res and res.Instance
+			if not (hit and (hit == target.Character or hit:IsDescendantOf(target.Character))) then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function canAttack(target)
+		if not (target and target.RootPart and target.Character and target.Character:IsDescendantOf(workspace)) then
+			return false
+		end
+		local delta = target.RootPart.Position - entitylib.character.RootPart.Position
+		if delta.Magnitude > AttackRange.Value then
+			return false
+		end
+		if Targets and Targets.Walls.Enabled then
+			local origin = gameCamera.CFrame.Position
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = {lplr.Character, gameCamera}
+			local res = workspace:Raycast(origin, delta.Unit * (delta.Magnitude + 2), params)
+			local hit = res and res.Instance
+			if not (hit and (hit == target.Character or hit:IsDescendantOf(target.Character))) then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function hitregCount()
+		if not Hitreg or Hitreg.Value == 'Default' then return 1 end
+		if Hitreg.Value == 'Low' then return 5 end
+		if Hitreg.Value == 'Medium' then return 15 end
+		return 35
+	end
+
+	local function fireAttack(payload, count)
+		local ok = pcall(function()
+			for _ = 1, count do
+				AttackRemote:FireServer(payload)
+			end
+		end)
+	end
+
+	local function silentAttack(target)
+		local actualRoot = target.Character.PrimaryPart or target.RootPart
+		if not actualRoot then return end
+		local selfpos = entitylib.character.RootPart.Position
+		local targetpos = actualRoot.Position
+		if MovementCorrection.Enabled then
+			local observed = prediction.GetObserved(target.RootPart)
+			local velocity = observed and observed.Velocity or target.RootPart.AssemblyLinearVelocity
+			if velocity and velocity.Magnitude > 0.5 then
+				targetpos = targetpos + velocity * ((lplr:GetNetworkPing() or 0) + 0.1)
+			end
+		end
+		local delta = targetpos - selfpos
+		local dir = delta.Unit
+		local pos = selfpos + dir * math.max(delta.Magnitude - 14.399, 0)
+		bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
+		store.attackReach = (delta.Magnitude * 100) // 1 / 100
+		store.attackReachUpdate = tick() + 1
+		local tool = store.hand.tool
+		local meta = tool and bedwars.ItemMeta[tool.Name]
+		if meta and meta.sword then
+			bedwars.SwordController:playSwordEffect(meta, 0)
+		end
+		fireAttack({
+			weapon = tool,
+			chargeRatio = 0,
+			entityInstance = target.Character,
+			validate = {
+				raycast = {
+					cameraPosition = {value = pos},
+					cursorDirection = {value = dir}
+				},
+				targetPosition = {value = targetpos},
+				selfPosition = {value = pos}
+			}
+		}, hitregCount())
+	end
 
 	local function getEmitter(part)
 		return part and part:FindFirstChildOfClass('ParticleEmitter')
@@ -144,23 +269,14 @@ run(function()
 												AttackDelay = AttackDelay + (math.random(0, 15) / 1000)
 											end
 
-											if Silent.Enabled and attacked[swing] then
-												local target = attacked[swing].Entity
-												local targetPos = target.RootPart.Position
-												local oldCF = entitylib.character.RootPart.CFrame
-
-												local jitterX, jitterZ = 0, 0
-												if BypassMode.Value == 'CFrame Jitter' then
-													local j = JitterAmount.Value
-													jitterX = math.random(-j * 100, j * 100) / 100
-													jitterZ = math.random(-j * 100, j * 100) / 100
-												end
-
-												local aimPos = entitylib.character.RootPart.Position + Vector3.new(jitterX, 0, jitterZ)
-												entitylib.character.RootPart.CFrame = CFrame.lookAt(aimPos, Vector3.new(targetPos.X + jitterX, aimPos.Y, targetPos.Z + jitterZ))
-												bedwars.SwordController:swingSwordAtMouse()
-												entitylib.character.RootPart.CFrame = oldCF
-											else
+if Silent.Enabled and attacked[swing] then
+											local target = attacked[swing].Entity
+											if canAttack(target) then
+												pcall(silentAttack, target)
+											end
+										else
+											local target = attacked[swing] and attacked[swing].Entity or (attacked[1] and attacked[1].Entity)
+											if canSwingHit(target) then
 												if BypassMode.Value == 'CFrame Jitter' then
 													local j = JitterAmount.Value
 													local oldCF = entitylib.character.RootPart.CFrame
@@ -171,6 +287,7 @@ run(function()
 													bedwars.SwordController:swingSwordAtMouse()
 												end
 											end
+										end
 										end
 									end
 								end
@@ -237,7 +354,7 @@ run(function()
 				table.clear(Particles)
 			end
 		end,
-		Tooltip = 'Attack players around you\nwithout aiming at them.\nSilent mode rotates attack only.'
+		Tooltip = 'Attack players around you\nwithout aiming at them.\nSilent mode attacks the target directly.'
 	})
 	Targets = Killaura:CreateTargets({Players = true, Walls = true})
 	CPS = Killaura:CreateTwoSlider({
@@ -294,6 +411,17 @@ run(function()
 	MultiSwing = Killaura:CreateToggle({
 		Name = 'Multi swing',
 		Tooltip = 'Attacks multiple targets per tick'
+	})
+	MovementCorrection = Killaura:CreateToggle({
+		Name = 'Movement correction',
+		Default = true,
+		Tooltip = 'Leads the target by your ping so\nattacks land on moving players'
+	})
+	Hitreg = Killaura:CreateDropdown({
+		Name = 'Hitreg',
+		List = {'Default', 'Low', 'Medium', 'High'},
+		Default = 'Default',
+		Tooltip = 'Number of attack packets sent per hit.\nDefault: 1 | Low: 5 | Medium: 15 | High: 35'
 	})
 	BypassMode = Killaura:CreateDropdown({
 		Name = 'Bypass mode',
@@ -820,6 +948,7 @@ run(function()
 			local block = getBlockAt(blockPos)
 			if block and not blocks[block] then
 				if not SelfBreak.Enabled and block:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
+				if block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then continue end
 				if (block:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
 				if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
 				blocks[block] = true
@@ -833,6 +962,7 @@ run(function()
 		if not beds then return false end
 		for _, bed in beds do
 			if (bed.Position - localPosition).Magnitude > Range.Value then continue end
+			if bed:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then continue end
 			if (bed:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
 			if not SelfBreak.Enabled and bed:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
 			if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end

@@ -3280,7 +3280,7 @@ function mainapi:Load(skipgui, profile)
 		local button = Instance.new('TextButton')
 		button.Size = UDim2.fromOffset(110, 110)
 		button.AnchorPoint = Vector2.new(0.5, 0)
-		button.Position = UDim2.new(0.5, 0, 0, 12)
+		button.Position = UDim2.new(0.5, 0, 0, 50)
 		button.BackgroundColor3 = Color3.new()
 		button.Text = ''
 		-- Parented under scaledgui (which carries the `scale` UIScale), not the raw
