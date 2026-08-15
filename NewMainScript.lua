@@ -1,6 +1,7 @@
--- NewMainScript.lua is the old loader and no longer injects on its own -- run loader.lua instead
-warn('[flintv4] NewMainScript.lua is deprecated -- run loader.lua instead')
-return
+if not shared.FlintV4Authenticated then
+	warn('[flintv4] NewMainScript.lua is the old loader and no longer injects on its own -- run loader.lua instead')
+	return
+end
 
 local isfile = isfile or function(file)
 	local suc, res = pcall(function()
@@ -26,10 +27,19 @@ end
 
 local function downloadFile(path, func)
 	if not hasContent(path) then
+		-- bedwars.lua only exists in the GitLab repo (kept separate/obfuscated there), at that
+		-- repo's ROOT even though it caches locally under games/; everything else lives in the
+		-- GitHub repo.
 		local relPath = select(1, path:gsub('flintv4/', ''))
+		local isBedwars = relPath == 'games/bedwars.lua'
+		-- Retried a few times: raw file hosts intermittently fail, returning an empty body that
+		-- would otherwise get cached as a corrupt/empty file.
 		local content
 		for attempt = 1, 4 do
 			local suc, res = pcall(function()
+				if isBedwars then
+					return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua', true)
+				end
 				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..relPath, true)
 			end)
 			if suc and res and res ~= '' and res ~= '404: Not Found' then
@@ -51,7 +61,7 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
-for _, folder in {'flintv4', 'flintv4/games', 'flintv4/profiles', 'flintv4/assets', 'flintv4/libraries', 'flintv4/guis'} do
+for _, folder in {'FlintV4', 'flintv4/games', 'flintv4/profiles', 'flintv4/assets', 'flintv4/libraries', 'flintv4/guis'} do
 	if not isfolder(folder) then
 		makefolder(folder)
 	end

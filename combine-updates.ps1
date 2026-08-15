@@ -68,7 +68,7 @@ Write-Host "  Done.`n" -ForegroundColor Green
 # === STEP 3: COPY PISTONWARE BASE FILES ===
 Write-Host "[3/9] Updating Pistonware base files..." -ForegroundColor Yellow
 foreach ($file in $PISTON_BASE_FILES) {
-    $src = Join-Path $TEMP_DIR "pistonware" $file
+    $src = Join-Path (Join-Path $TEMP_DIR "pistonware") $file
     $dst = Join-Path $FLINTV4_DIR $file
     if (Test-Path $src) {
         if (-not $DryRun) { Copy-Item $src $dst -Force }
@@ -80,7 +80,7 @@ Write-Host ""
 # === STEP 4: COPY CATV6 EXTRAS ===
 Write-Host "[4/9] Updating CatV6 extras..." -ForegroundColor Yellow
 foreach ($file in $CATV6_EXTRAS) {
-    $src = Join-Path $TEMP_DIR "catv6" $file
+    $src = Join-Path (Join-Path $TEMP_DIR "catv6") $file
     $dst = Join-Path $FLINTV4_DIR $file
     if (Test-Path $src) {
         $dstDir = Split-Path $dst -Parent
@@ -94,8 +94,8 @@ Write-Host ""
 # === STEP 5: MERGE FOLDERS (skip protected files) ===
 Write-Host "[5/9] Merging folders..." -ForegroundColor Yellow
 foreach ($folder in $MERGE_FOLDERS) {
-    $pistonDir = Join-Path $TEMP_DIR "pistonware" $folder
-    $catv6Dir  = Join-Path $TEMP_DIR "catv6" $folder
+    $pistonDir = Join-Path (Join-Path $TEMP_DIR "pistonware") $folder
+    $catv6Dir  = Join-Path (Join-Path $TEMP_DIR "catv6") $folder
     $flintDir  = Join-Path $FLINTV4_DIR $folder
 
     $pistonFiles = @(); $catv6Files = @()

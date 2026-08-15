@@ -1,5 +1,14 @@
+-- The loader is the only supported entry point: it runs the LuaArmor key gate and publishes
+-- script_key (which the protected bedwars.lua reads) before any of this downloads or executes.
 -- main.lua is re-run directly in two places -- the queued teleport script below, and the GUI's
--- reinject buttons.
+-- reinject buttons -- and both re-establish that state first, so reaching here without it means
+-- the gate was skipped. Checked before the uninject below, so a failed check cannot tear down a
+-- working instance on its way out.
+if not shared.FlintV4Authenticated then
+	warn('[flintv4] not authenticated -- run the pistonware loader and enter your key')
+	return
+end
+
 -- pcall'd: after a teleport shared.vape can still point at the previous server's instance,
 -- whose GUI and connections no longer exist. An error walking that corpse would abort main.lua
 -- on line one and leave the queued re-injection doing nothing at all.
@@ -25,66 +34,7 @@ end
 local cloneref = cloneref or function(obj)
 	return obj
 end
-local listfiles = listfiles or function(folder)
-	return {}
-end
-local delfile = delfile or function(file)
-	pcall(function() writefile(file, '') end)
-end
-local isfolder = isfolder or function() return false end
 local playersService = cloneref(game:GetService('Players'))
-
--- Version check: compare local version with remote, delete stale cache files if updated
-local function checkForUpdates()
-	local localVersion = ''
-	if isfile('flintv4/version.txt') then
-		pcall(function() localVersion = readfile('flintv4/version.txt') end)
-	end
-
-	local remoteVersion = ''
-	local suc, res = pcall(function()
-		return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/version.txt', true)
-	end)
-	if suc and res and res ~= '' and res ~= '404: Not Found' then
-		remoteVersion = res:gsub('%s+', '')
-	end
-
-	if remoteVersion ~= '' and remoteVersion ~= localVersion then
-		warn('[flintv4] Update detected ('..(localVersion ~= '' and localVersion or 'none')..' -> '..remoteVersion..')')
-		-- On version bump, clear ALL cached files that have the watermark (unmodified downloads).
-		-- The loader's updateCachedFiles will re-download them from the latest commit.
-		local httpService = cloneref(game:GetService('HttpService'))
-		local manifest = {}
-		pcall(function()
-			if isfile('flintv4/filecheck.json') then
-				manifest = httpService:JSONDecode(readfile('flintv4/filecheck.json'))
-			end
-		end)
-
-		local function checkFolder(folder)
-			for _, path in listfiles(folder) do
-				if isfolder(path) then
-					checkFolder(path)
-				elseif path:sub(-4) == '.lua' then
-					local ok, content = pcall(readfile, path)
-					if ok and type(content) == 'string' and content:sub(1, 60):find('watermark') then
-						pcall(delfile, path)
-						-- remove from manifest so loader re-downloads it
-						local rel = path:gsub('\\', '/'):gsub('^flintv4/', '')
-						manifest[rel] = nil
-						warn('[flintv4] Deleted stale cached: '..path)
-					end
-				end
-			end
-		end
-
-		pcall(checkFolder, 'flintv4')
-		pcall(writefile, 'flintv4/filecheck.json', httpService:JSONEncode(manifest))
-		pcall(writefile, 'flintv4/version.txt', remoteVersion)
-		warn('[flintv4] Version updated to '..remoteVersion)
-	end
-end
-pcall(checkForUpdates)
 
 -- isfile is not the question. A zero-byte file reads back as PRESENT through every executor's
 -- real isfile, and only the fallback above treats empty as absent -- so on executors that ship
@@ -106,10 +56,19 @@ end
 
 local function downloadFile(path, func)
 	if not hasContent(path) then
+		-- bedwars.lua only exists in the GitLab repo (kept separate/obfuscated there), at that
+		-- repo's ROOT even though it caches locally under games/; everything else lives in the
+		-- GitHub repo.
 		local relPath = select(1, path:gsub('flintv4/', ''))
+		local isBedwars = relPath == 'games/bedwars.lua'
+		-- Retried a few times: raw file hosts intermittently fail, returning an empty body that
+		-- would otherwise get cached as a corrupt/empty file.
 		local content
 		for attempt = 1, 4 do
 			local suc, res = pcall(function()
+				if isBedwars then
+					return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua', true)
+				end
 				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..relPath, true)
 			end)
 			-- For .lua files, a compile check too: an outage can hand back the 503/error page
@@ -269,10 +228,19 @@ local function finishLoading()
 		autosave loop therefore sit behind the same wait.
 
 		A normal game script has already finished by the time we get here (task.spawn runs it
-		inline until it yields, and only the BedWars game script yields), so this whole block runs
+		inline until it yields, and only bedwars.lua yields), so this whole block runs
 		synchronously and behaves exactly as it always did.
 	]]
 	local function applyProfile()
+		-- A session LuaArmor refused registered no game modules at all (see the session
+		-- block at the top of bedwars.lua). Loading a profile against that empty set would
+		-- bring everything up on defaults, and the Save below would write those defaults
+		-- back -- deleting the user's real config. Withholding the modules is the intended
+		-- consequence of a refusal; deleting configs is not, so do neither here.
+		if shared.FlintV4SessionRejected then
+			warn('[flintv4] session was not authorised -- leaving profiles untouched')
+			return
+		end
 		vape:Load(nil, customProfile)
 		profileApplied = true
 		-- Persist the applied profile so a reinject before the first autosave tick still comes
@@ -281,12 +249,16 @@ local function finishLoading()
 			pcall(function() vape:Save() end)
 		end
 		-- Only now is autosaving safe, and only now is there a profile worth saving.
+		-- The rejection check repeats inside the wait as well as at the top: a key can be
+		-- revoked mid-session, and when that happens bedwars.lua switches every module off.
+		-- Catching the flag only once per cycle would leave up to ten seconds in which this
+		-- loop could persist that switched-off state over a good config.
 		task.spawn(function()
-			while vape.Loaded do
+			while vape.Loaded and not shared.FlintV4SessionRejected do
 				vape:Save()
 				for _ = 1, 10 do
 					task.wait(1)
-					if not vape.Loaded then break end
+					if not vape.Loaded or shared.FlintV4SessionRejected then break end
 				end
 			end
 		end)
@@ -295,18 +267,33 @@ local function finishLoading()
 	-- Waits until the game script has finished registering its modules, because the profile can
 	-- only be applied to modules that exist.
 	--
-	-- An ordinary game script RETURNS, which sets gameScriptFinished. The timeout is a backstop.
+	-- There are exactly two ways that finish is observable, and no third:
+	--   * an ordinary game script RETURNS, which sets gameScriptFinished
+	--   * BedWars pulls in a LuaArmor-protected payload which never returns (the VM keeps the
+	--     thread it was invoked on), so bedwars.lua sets shared.FlintV4BedwarsLoaded as its
+	--     final statement
+	--
+	-- An earlier version tried to infer completion by watching the module count go quiet. It
+	-- does not work, and cannot be made to: the first seconds of downloadBedwars() are pure
+	-- network, so nothing registers, and "nothing registering" is indistinguishable from
+	-- "finished". It declared victory at 4s -- before the payload had started -- and every
+	-- module that appeared afterwards was left on defaults. Guessing is worse than waiting.
+	--
+	-- The timeout is a backstop, not a mechanism. It only matters when the payload on LuaArmor
+	-- predates the completion flag; re-upload bedwars.lua and this returns the moment it lands.
 	local function waitForModules()
 		if gameScriptFinished then return end
 		local started = os.clock()
 		repeat
 			task.wait(0.1)
 		until gameScriptFinished
+			or shared.FlintV4BedwarsLoaded
 			or os.clock() - started > 120
 		local count = 0
 		for _ in vape.Modules do count += 1 end
-		local how = gameScriptFinished and 'game script returned'
-			or 'TIMED OUT after 120s'
+		local how = shared.FlintV4BedwarsLoaded and 'payload signalled'
+			or gameScriptFinished and 'game script returned'
+			or 'TIMED OUT after 120s -- re-upload bedwars.lua to LuaArmor so it can signal when it is done'
 		warn(('[flintv4] %d modules in %.1fs (%s) -- applying profile'):format(count, os.clock() - started, how))
 	end
 
@@ -337,13 +324,22 @@ local function finishLoading()
 					loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/main.lua', true), 'main')()
 				end
 			]]
+			-- Globals and shared do not survive a teleport, and the new server re-runs main.lua
+			-- directly rather than the loader -- so the key gate's output has to be re-published
+			-- by hand here. Without it the guard at the top of this file would reject the
+			-- re-injection, and bedwars.lua would be handed to loadstring with no script_key.
+			-- %q so a key containing a quote or backslash still produces a valid chunk.
+			if shared.PistonwareKey then
+				local quoted = string.format('%q', shared.PistonwareKey)
+				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\nshared.FlintV4Authenticated = true\n'..teleportScript
+			end
 			if shared.FlintV4Developer then
 				teleportScript = 'shared.FlintV4Developer = true\n'..teleportScript
 			end
 			if shared.VapeSmoothBoot then
 				teleportScript = 'shared.VapeSmoothBoot = true\n'..teleportScript
 			end
-			-- %q: profile names are user-supplied (the Profiles tab lets
+			-- %q, matching the key above: profile names are user-supplied (the Profiles tab lets
 			-- you name one anything), and a name containing a quote or backslash used to produce
 			-- a chunk that would not compile -- which silently costs the whole re-injection, not
 			-- just the profile.
@@ -374,7 +370,7 @@ local function finishLoading()
 	if not shared.vapereload then
 		if not vape.Categories then return end
 		if vape.Categories.Main.Options['GUI bind indicator'].Enabled then
-			vape:CreateNotification('FlintV4 | Finished Loading', vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press '..table.concat(vape.Keybind, ' + '):upper()..' to open GUI', 5)
+			vape:CreateNotification('Pistonware | Finished Loading', vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press '..table.concat(vape.Keybind, ' + '):upper()..' to open GUI', 5)
 		end
 	end
 end
@@ -383,10 +379,6 @@ end
 		writefile('flintv4/profiles/gui.txt', 'new')
 	end
 	local gui = readfile('flintv4/profiles/gui.txt')
-	if not table.find({'new', 'old'}, gui) then
-		gui = 'new'
-		writefile('flintv4/profiles/gui.txt', 'new')
-	end
 
 	if not isfolder('flintv4/assets/'..gui) then
 		makefolder('flintv4/assets/'..gui)
@@ -397,12 +389,6 @@ end
 	end
 	destroyDownloader()
 	vape = loadstring(downloadFile('flintv4/guis/'..gui..'.lua'), 'gui')()
-	if not vape then
-		warn('[flintv4] GUI theme "'..gui..'" failed to load, falling back to new')
-		gui = 'new'
-		writefile('flintv4/profiles/gui.txt', 'new')
-		vape = loadstring(downloadFile('flintv4/guis/new.lua'), 'gui')()
-	end
 	shared.vape = vape
 
 if not shared.VapeIndependent then
@@ -436,9 +422,10 @@ if not shared.VapeIndependent then
 	-- file except BedWars -- has already set gameScriptFinished before we get past this line,
 	-- and finishLoading takes the single-pass path exactly as it always did.
 	--
-	-- BedWars is the exception. The CatV6 BedWars script takes ~30s and none of its modules can
-	-- exist until it finishes -- that part is not fixable from here. What it must not do is hold
-	-- up the GUI, the universal modules and your config, none of which have anything to do with it.
+	-- BedWars is the exception. bedwars.lua is 425KB interpreted by a LuaArmor VM and takes
+	-- ~30s, and none of its modules can exist until it finishes -- that part is not fixable from
+	-- here. What it must not do is hold up the GUI, the universal modules and your config, none
+	-- of which have anything to do with it.
 	--
 	-- Varargs are packed because '...' is only valid directly in this chunk, never inside the
 	-- nested function the spawn needs.
@@ -447,30 +434,46 @@ if not shared.VapeIndependent then
 		local fn = loadstring(source, chunkname)
 		if not fn then return end
 		gameScriptFinished = false
+		-- Cleared per run, not just per session: shared survives a reinject, and a leftover true
+		-- from the previous injection would tell waitForModules the payload had already finished
+		-- before it had even started re-registering.
+		shared.FlintV4BedwarsLoaded = nil
+		-- Same reasoning for the refusal flag: bedwars.lua sets it from a fresh verdict every
+		-- run, but a game script that never sets it at all (the lobby) would otherwise inherit
+		-- a true left behind by a revoked BedWars session and refuse to save profiles there.
+		shared.FlintV4SessionRejected = nil
+
+		-- Re-publish the key immediately before the game script runs. LuaArmor blanks the global
+		-- script_key once it has authenticated, so it is single-use per session and any later
+		-- load finds nothing -- which is not a soft failure, it kicks the player.
+		--
+		-- games/6872274481.lua does this too, closer to the payload, but that file is CACHED:
+		-- anyone still holding a copy from before it gained that call would never get it. This
+		-- file is the one that is reliably current, so the safety net belongs here as well.
+		--
+		-- Written to all three tables because executors disagree on what a loadstring'd chunk's
+		-- environment is -- on several mobile executors a bare global, getgenv() and _G are
+		-- genuinely different tables, and the payload only reads one of them.
+		if type(shared.PistonwareKey) == 'string' and shared.PistonwareKey ~= '' then
+			local key = shared.PistonwareKey
+			script_key = key
+			pcall(function() getgenv().script_key = key end)
+			pcall(function() _G.script_key = key end)
+		end
 
 		local started = os.clock()
-		local thread = task.spawn(function()
+		task.spawn(function()
 			local ok, err = pcall(fn, table.unpack(gameArgs, 1, gameArgs.n))
-			-- Only for a game script slow enough that the split-load path actually engaged; a normal
-			-- game script never trips it.
+			gameScriptFinished = true
+			-- Only for a payload slow enough that the split-load path actually engaged; a normal
+			-- game script never trips it. Keeps the real cost of protecting bedwars.lua visible
+			-- instead of guessed at.
 			local elapsed = os.clock() - started
 			if elapsed > 5 then
 				warn(('[flintv4] %s finished in %.1fs -- its modules now have their saved settings'):format(chunkname, elapsed))
 			end
 			if not ok then
 				warn('[flintv4] '..chunkname..' errored: '..tostring(err))
-			end
-		end)
-		-- gameScriptFinished is set INSIDE the coroutine above. If the coroutine is
-		-- killed mid-yield (e.g. by a teleport destroying the running thread), the
-		-- flag never flips and waitForModules hangs for the full 120s timeout.
-		-- Safety net: poll until the thread is dead, then force the flag. A fast
-		-- game script sets it before we even get here, so the extra check costs nothing.
-		task.spawn(function()
-			repeat task.wait(1) until gameScriptFinished or coroutine.status(thread) == 'dead'
-			if not gameScriptFinished then
-				warn('[flintv4] '..chunkname..' coroutine died before setting gameScriptFinished -- forcing completion')
-				gameScriptFinished = true
 			end
 		end)
 	end

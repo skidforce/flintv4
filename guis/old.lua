@@ -3675,7 +3675,7 @@ local profilescategory = mainapi:CreateCategoryList({
 	Profiles = true
 })
 
--- Redownloads flintv4/profiles the way loader.lua does on a first install: every file the
+-- Redownloads pistonware/profiles the way loader.lua does on a first install: every file the
 -- repo keeps in that folder, pulled from the raw host through the same 4-attempt retry (raw
 -- hosts 504 intermittently, and an empty body would otherwise land as a corrupt file).
 -- Two things differ from loader.lua's downloadFile, both required for a sync rather than an
@@ -3683,7 +3683,7 @@ local profilescategory = mainapi:CreateCategoryList({
 -- sync would download nothing at all), and nothing is filtered out. <GameId>.gui.txt carries
 -- the config's GUI theme colour and window layout, so holding it back was what made a synced
 -- config come back looking exactly like the one it replaced.
--- flintv4/profiles is stamped with the commit it was pulled from, so a sync that would
+-- pistonware/profiles is stamped with the commit it was pulled from, so a sync that would
 -- change nothing can be turned away before it spends any requests finding that out. Nothing
 -- else in the codebase reads profilecommit.txt; this is what writes it.
 local function localProfileCommit()
@@ -4203,7 +4203,7 @@ scaleslider = topbar:CreateSlider({
 	Visible = false
 })
 mainapi.HideVapeButton = topbar:CreateToggle({
-	Name = 'Hide FlintV4 Mobile Button',
+	Name = 'Hide Pistonware Mobile Button',
 	Function = function(callback)
 		-- Drops the transparencies rather than flipping Visible. An invisible
 		-- GuiObject stops hit-testing in Roblox, so hiding the button used to take
@@ -4217,11 +4217,11 @@ mainapi.HideVapeButton = topbar:CreateToggle({
 			end
 		end
 	end,
-	Tooltip = 'Makes the FlintV4 button invisible on mobile\nIt still opens the GUI when tapped'
+	Tooltip = 'Makes the Pistonware button invisible on mobile\nIt still opens the GUI when tapped'
 })
 topbar:CreateDropdown({
 	Name = 'GUI Theme',
-	List = inputService.TouchEnabled and {'new', 'old'} or {'new', 'old'},
+	List = inputService.TouchEnabled and {'new', 'old'} or {'new', 'old', 'rise'},
 	Function = function(val, mouse)
 		if mouse then
 			writefile('flintv4/profiles/gui.txt', val)
@@ -4233,7 +4233,7 @@ topbar:CreateDropdown({
 			end
 		end
 	end,
-	Tooltip = 'new - The newest vape theme since v4.05\nold - The vape theme pre v4.05'
+	Tooltip = 'new - The newest vape theme to since v4.05\nold - The vape theme pre v4.05\nrise - Rise 6.0'
 })
 mainapi.RainbowMode = topbar:CreateDropdown({
 	Name = 'Rainbow Mode',
@@ -4341,7 +4341,7 @@ topbar:CreateButton({
 	Function = function()
 		loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/refs/heads/main/reinstall.lua', true))()
 	end,
-	Tooltip = 'Uninjects, deletes the flintv4 folder and downloads everything again'
+	Tooltip = 'Uninjects, deletes the pistonware folder and downloads everything again'
 })
 topbar:CreateBind()
 

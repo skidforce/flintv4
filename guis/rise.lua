@@ -2752,7 +2752,7 @@ local profilescategory = mainapi:CreateCategoryProfile({
 	Placeholder = 'Type name'
 })
 
--- Redownloads flintv4/profiles the way loader.lua does on a first install: every file the
+-- Redownloads pistonware/profiles the way loader.lua does on a first install: every file the
 -- repo keeps in that folder, pulled from the raw host through the same 4-attempt retry (raw
 -- hosts 504 intermittently, and an empty body would otherwise land as a corrupt file).
 -- Two things differ from loader.lua's downloadFile, both required for a sync rather than an
@@ -2760,7 +2760,7 @@ local profilescategory = mainapi:CreateCategoryProfile({
 -- sync would download nothing at all), and nothing is filtered out. <GameId>.gui.txt carries
 -- the config's GUI theme colour and window layout, so holding it back was what made a synced
 -- config come back looking exactly like the one it replaced.
--- flintv4/profiles is stamped with the commit it was pulled from, so a sync that would
+-- pistonware/profiles is stamped with the commit it was pulled from, so a sync that would
 -- change nothing can be turned away before it spends any requests finding that out. Nothing
 -- else in the codebase reads profilecommit.txt; this is what writes it.
 local function localProfileCommit()
@@ -3284,7 +3284,7 @@ scaleslider = mainapi.Categories.Main:CreateSlider({
 })
 mainapi.Categories.Main:CreateDropdown({
 	Name = 'GUI Theme',
-	List = {'new', 'old'},
+	List = {'rise', 'new', 'old'},
 	Function = function(val, mouse)
 		if mouse then
 			writefile('flintv4/profiles/gui.txt', val)
