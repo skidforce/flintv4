@@ -61,7 +61,7 @@ run(function()
 	task.spawn(function()
 		for _ = 1, 10 do
 			local ok, remote = pcall(function()
-				return bedwars.Client:Get(bedwars.SwordController.sendServerRequest).instance
+				return bedwars.Client:Get('SwordHit').instance
 			end)
 			if ok and remote then
 				AttackRemote = remote
