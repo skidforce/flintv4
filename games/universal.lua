@@ -1,7 +1,7 @@
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err and vape then
-		vape:CreateNotification('FlintV4', 'Failed to load : '..err, 30, 'alert')
+		vape:CreateNotification('SkidV5', 'Failed to load : '..err, 30, 'alert')
 	end
 	return res
 end
@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('flintv4/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/'..select(1, path:gsub('skidv5/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -72,7 +72,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 89, 1, 52)
 	blur.Position = UDim2.fromOffset(-48, -31)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('flintv4/assets/new/blur.png')
+	blur.Image = getcustomasset('skidv5/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(52, 31, 261, 502)
 	blur.Parent = parent
@@ -161,7 +161,7 @@ local function serverHop(pointer, filter)
 		table.insert(visited, game.JobId)
 	end
 	if not pointer then
-		notif('FlintV4', 'Searching for an available server.', 2)
+		notif('SkidV5', 'Searching for an available server.', 2)
 	end
 
 	local suc, httpdata = pcall(function()
@@ -174,7 +174,7 @@ local function serverHop(pointer, filter)
 				cacheExpire, cache = tick() + 60, httpdata
 				table.insert(attempted, v.id)
 
-				notif('FlintV4', 'Found! Teleporting.', 5)
+				notif('SkidV5', 'Found! Teleporting.', 5)
 				teleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
 				return
 			end
@@ -183,10 +183,10 @@ local function serverHop(pointer, filter)
 		if data.nextPageCursor then
 			serverHop(data.nextPageCursor, filter)
 		else
-			notif('FlintV4', 'Failed to find an available server.', 5, 'warning')
+			notif('SkidV5', 'Failed to find an available server.', 5, 'warning')
 		end
 	else
-		notif('FlintV4', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
+		notif('SkidV5', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
 	end
 end
 
@@ -228,9 +228,9 @@ local function motorMove(target, cf)
 	task.delay(0, part.Destroy, part)
 end
 
-local hash = loadstring(downloadFile('flintv4/libraries/hash.lua'), 'hash')()
-local prediction = loadstring(downloadFile('flintv4/libraries/prediction.lua'), 'prediction')()
-entitylib = loadstring(downloadFile('flintv4/libraries/entity.lua'), 'entitylibrary')()
+local hash = loadstring(downloadFile('skidv5/libraries/hash.lua'), 'hash')()
+local prediction = loadstring(downloadFile('skidv5/libraries/prediction.lua'), 'prediction')()
+entitylib = loadstring(downloadFile('skidv5/libraries/entity.lua'), 'entitylibrary')()
 local whitelist = {
 	alreadychecked = {},
 	customtags = {},
@@ -430,7 +430,7 @@ run(function()
 			if self.localprio == 0 then
 				olduninject = vape.Uninject
 				vape.Uninject = function()
-					notif('FlintV4', 'No escaping the private members :)', 10)
+					notif('SkidV5', 'No escaping the private members :)', 10)
 				end
 			end
 		end
@@ -560,7 +560,7 @@ run(function()
 
 		if not first or whitelist.textdata ~= whitelist.olddata then
 			if not first then
-				whitelist.olddata = isfile('flintv4/profiles/whitelist.json') and readfile('flintv4/profiles/whitelist.json') or nil
+				whitelist.olddata = isfile('skidv5/profiles/whitelist.json') and readfile('skidv5/profiles/whitelist.json') or nil
 			end
 
 			local suc, res = pcall(function()
@@ -609,7 +609,7 @@ run(function()
 				end
 				whitelist.olddata = whitelist.textdata
 				pcall(function()
-					writefile('flintv4/profiles/whitelist.json', whitelist.textdata)
+					writefile('skidv5/profiles/whitelist.json', whitelist.textdata)
 				end)
 			end
 
@@ -3440,7 +3440,7 @@ run(function()
 		arrow.BackgroundTransparency = 1
 		arrow.BorderSizePixel = 0
 		arrow.Visible = false
-		arrow.Image = getcustomasset('flintv4/assets/new/arrowmodule.png')
+		arrow.Image = getcustomasset('skidv5/assets/new/arrowmodule.png')
 		arrow.ImageColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		arrow.Parent = Folder
 		Reference[ent] = arrow
@@ -5198,7 +5198,7 @@ run(function()
 	
 	Radar = vape:CreateOverlay({
 		Name = 'Radar',
-		Icon = getcustomasset('flintv4/assets/new/radaricon.png'),
+		Icon = getcustomasset('skidv5/assets/new/radaricon.png'),
 		Size = UDim2.fromOffset(14, 14),
 		Position = UDim2.fromOffset(12, 13),
 		Function = function(callback)
@@ -5419,7 +5419,7 @@ run(function()
 	
 	SessionInfo = vape:CreateOverlay({
 		Name = 'Session Info',
-		Icon = getcustomasset('flintv4/assets/new/textguiicon.png'),
+		Icon = getcustomasset('skidv5/assets/new/textguiicon.png'),
 		Size = UDim2.fromOffset(16, 12),
 		Position = UDim2.fromOffset(12, 14),
 		Function = function(callback)
@@ -5489,8 +5489,8 @@ run(function()
 	Hide = SessionInfo:CreateTextList({
 		Name = 'Blacklist',
 		Tooltip = 'Name of entry to hide.',
-		Icon = getcustomasset('flintv4/assets/new/blockedicon.png'),
-		Tab = getcustomasset('flintv4/assets/new/blockedtab.png'),
+		Icon = getcustomasset('skidv5/assets/new/blockedicon.png'),
+		Tab = getcustomasset('skidv5/assets/new/blockedtab.png'),
 		TabSize = UDim2.fromOffset(21, 16),
 		Color = Color3.fromRGB(250, 50, 56)
 	})

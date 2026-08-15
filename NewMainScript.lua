@@ -1,5 +1,5 @@
-if not shared.FlintV4Authenticated then
-	warn('[flintv4] NewMainScript.lua is the old loader and no longer injects on its own -- run loader.lua instead')
+if not shared.SkidV5Authenticated then
+	warn('[skidv5] NewMainScript.lua is the old loader and no longer injects on its own -- run loader.lua instead')
 	return
 end
 
@@ -30,7 +30,7 @@ local function downloadFile(path, func)
 		-- bedwars.lua only exists in the GitLab repo (kept separate/obfuscated there), at that
 		-- repo's ROOT even though it caches locally under games/; everything else lives in the
 		-- GitHub repo.
-		local relPath = select(1, path:gsub('flintv4/', ''))
+		local relPath = select(1, path:gsub('skidv5/', ''))
 		local isBedwars = relPath == 'games/bedwars.lua'
 		-- Retried a few times: raw file hosts intermittently fail, returning an empty body that
 		-- would otherwise get cached as a corrupt/empty file.
@@ -38,9 +38,9 @@ local function downloadFile(path, func)
 		for attempt = 1, 4 do
 			local suc, res = pcall(function()
 				if isBedwars then
-					return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua', true)
+					return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/games/bedwars.lua', true)
 				end
-				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..relPath, true)
+				return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/'..relPath, true)
 			end)
 			if suc and res and res ~= '' and res ~= '404: Not Found' then
 				content = res
@@ -61,7 +61,7 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
-for _, folder in {'FlintV4', 'flintv4/games', 'flintv4/profiles', 'flintv4/assets', 'flintv4/libraries', 'flintv4/guis'} do
+for _, folder in {'SkidV5', 'skidv5/games', 'skidv5/profiles', 'skidv5/assets', 'skidv5/libraries', 'skidv5/guis'} do
 	if not isfolder(folder) then
 		makefolder(folder)
 	end
@@ -69,9 +69,9 @@ end
 
 -- catvape profile system credit to maxlasertech
 pcall(function()
-	if #listfiles('flintv4/profiles') < 3 then
+	if #listfiles('skidv5/profiles') < 3 then
 		local reqSuc, res = pcall(function()
-			return game:HttpGet('https://api.github.com/repos/skidforce/flintv4/contents/profiles', true)
+			return game:HttpGet('https://api.github.com/repos/skidforce/skidv5/contents/profiles', true)
 		end)
 		if reqSuc and res and res ~= '404: Not Found' then
 			local bodySuc, body = pcall(function()
@@ -84,7 +84,7 @@ pcall(function()
 					if v.type == 'file' then
 						pending += 1
 						task.spawn(function()
-							pcall(downloadFile, 'flintv4/'.. ({v.path:gsub(' ', '%%20')})[1])
+							pcall(downloadFile, 'skidv5/'.. ({v.path:gsub(' ', '%%20')})[1])
 							pending -= 1
 							if pending <= 0 then
 								done:Fire()
@@ -101,4 +101,4 @@ pcall(function()
 	end
 end)
 
-return loadstring(downloadFile('flintv4/main.lua'), 'main')()
+return loadstring(downloadFile('skidv5/main.lua'), 'main')()

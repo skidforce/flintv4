@@ -120,9 +120,9 @@ local themecolors = {
 }
 
 local getcustomassets = {
-	['flintv4/assets/rise/slice.png'] = 'rbxasset://risesix/slice.png',
-	['flintv4/assets/rise/blur.png'] = 'rbxasset://risesix/blur.png',
-	['flintv4/assets/new/blur.png'] = 'rbxassetid://14898786664',
+	['skidv5/assets/rise/slice.png'] = 'rbxasset://risesix/slice.png',
+	['skidv5/assets/rise/blur.png'] = 'rbxasset://risesix/blur.png',
+	['skidv5/assets/new/blur.png'] = 'rbxassetid://14898786664',
 }
 
 local isfile = isfile or function(file)
@@ -147,7 +147,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 42, 1, 42)
 	blur.Position = UDim2.fromOffset(-24, -15)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('flintv4/assets/new/blur.png')
+	blur.Image = getcustomasset('skidv5/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(44, 38, 804, 595)
 	blur.Parent = parent
@@ -244,7 +244,7 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		createDownloader(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/'..select(1, path:gsub('flintv4/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/'..select(1, path:gsub('skidv5/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -329,21 +329,21 @@ end
 
 local function writeFont()
 	if not assetfunction then return 'rbxasset://fonts/productsans.json' end
-	writefile('flintv4/assets/rise/risefont.json', httpService:JSONEncode({
+	writefile('skidv5/assets/rise/risefont.json', httpService:JSONEncode({
 		name = 'ProductSans',
 		faces = {
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Light.otf'), name = 'Light', weight = 300},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Regular.otf'), name = 'Regular', weight = 400},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/SF-Pro-Rounded-Medium.otf'), name = 'Medium', weight = 500},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/Icon-1.ttf'), name = 'Icon1', weight = 600},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/rise/Icon-3.ttf'), name = 'Icon3', weight = 800}
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/rise/SF-Pro-Rounded-Light.otf'), name = 'Light', weight = 300},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/rise/SF-Pro-Rounded-Regular.otf'), name = 'Regular', weight = 400},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/rise/SF-Pro-Rounded-Medium.otf'), name = 'Medium', weight = 500},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/rise/Icon-1.ttf'), name = 'Icon1', weight = 600},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/rise/Icon-3.ttf'), name = 'Icon3', weight = 800}
 		}
 	}))
-	return getcustomasset('flintv4/assets/rise/risefont.json')
+	return getcustomasset('skidv5/assets/rise/risefont.json')
 end
 
 if inputService.TouchEnabled then
-	writefile('flintv4/profiles/gui.txt', 'new')
+	writefile('skidv5/profiles/gui.txt', 'new')
 	return
 end
 
@@ -355,7 +355,7 @@ do
 	uipallet.FontIcon1 = Font.new(risefont, Enum.FontWeight.SemiBold)
 	uipallet.FontIcon3 = Font.new(risefont, Enum.FontWeight.ExtraBold)
 
-	local res = isfile('flintv4/profiles/color.txt') and loadJson('flintv4/profiles/color.txt')
+	local res = isfile('skidv5/profiles/color.txt') and loadJson('skidv5/profiles/color.txt')
 	if res then
 		uipallet.Main = res.Main and Color3.fromRGB(unpack(res.Main)) or uipallet.Main
 		uipallet.Text = res.Text and Color3.fromRGB(unpack(res.Text)) or uipallet.Text
@@ -1195,8 +1195,8 @@ function mainapi:Load(skipgui, profile)
 	local guidata = {}
 	local savecheck = true
 
-	if isfile('flintv4/profiles/'..game.GameId..'.gui.txt') then
-		guidata = loadJson('flintv4/profiles/'..game.GameId..'.gui.txt')
+	if isfile('skidv5/profiles/'..game.GameId..'.gui.txt') then
+		guidata = loadJson('skidv5/profiles/'..game.GameId..'.gui.txt')
 		if not guidata then
 			guidata = {Categories = {}}
 			self:CreateNotification('Vape', 'Failed to load GUI settings.', 10, 'alert')
@@ -1225,8 +1225,8 @@ function mainapi:Load(skipgui, profile)
 	}}
 	--self.Categories.Profiles:ChangeValue()
 
-	if isfile('flintv4/profiles/'..self.Profile..self.Place..'.txt') then
-		local savedata = loadJson('flintv4/profiles/'..self.Profile..self.Place..'.txt')
+	if isfile('skidv5/profiles/'..self.Profile..self.Place..'.txt') then
+		local savedata = loadJson('skidv5/profiles/'..self.Profile..self.Place..'.txt')
 		if not savedata then
 			savedata = {
 				Categories = {},
@@ -1347,8 +1347,8 @@ function mainapi:Save(newprofile)
 		}
 	end
 
-	writefile('flintv4/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
-	writefile('flintv4/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
+	writefile('skidv5/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
+	writefile('skidv5/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
 end
 
 function mainapi:SaveOptions(object, savedoptions)
@@ -1738,10 +1738,10 @@ mainapi.Categories.Main:CreateDropdown({
 	List = {'rise', 'new', 'old'},
 	Function = function(val, mouse)
 		if mouse then
-			writefile('flintv4/profiles/gui.txt', val)
+			writefile('skidv5/profiles/gui.txt', val)
 			shared.vapereload = true
-			if shared.FlintV4Developer then
-				loadstring(readfile('flintv4/loader.lua'), 'loader')()
+			if shared.SkidV5Developer then
+				loadstring(readfile('skidv5/loader.lua'), 'loader')()
 			else
 				loadstring(game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/loader.lua', true))()
 			end
@@ -1768,8 +1768,8 @@ mainapi.Categories.Main:CreateButton({
 	Name = 'Reinject',
 	Function = function()
 		shared.vapereload = true
-		if shared.FlintV4Developer then
-			loadstring(readfile('flintv4/loader.lua'), 'loader')()
+		if shared.SkidV5Developer then
+			loadstring(readfile('skidv5/loader.lua'), 'loader')()
 		else
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/loader.lua', true))()
 		end
@@ -2127,7 +2127,7 @@ function mainapi:UpdateTextGUI(afterload)
 					holderline.Size = UDim2.fromOffset(2, 18)
 					holderline.Position = UDim2.new(1, 0, 0, 2)
 					holderline.BackgroundTransparency = 1
-					holderline.Image = getcustomasset('flintv4/assets/rise/slice.png')
+					holderline.Image = getcustomasset('skidv5/assets/rise/slice.png')
 					holderline.ImageColor3 = uipallet.MainColor
 					holderline.ZIndex = -1
 					holderline.Parent = holderbackground

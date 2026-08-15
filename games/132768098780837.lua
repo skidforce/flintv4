@@ -1295,7 +1295,7 @@ end)
 -- ============================================
 do
 	local gameId = game.GameId
-	local configPath = 'flintv4/profiles/'..gameId..'.txt'
+	local configPath = 'skidv5/profiles/'..gameId..'.txt'
 
 	local function loadConfig()
 		if isfile(configPath) then

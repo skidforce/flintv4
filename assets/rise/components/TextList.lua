@@ -80,8 +80,8 @@ function optionapi:ChangeValue(val)
 			if ind then
 				if val ~= 'default' then
 					table.remove(mainapi.Profiles, ind)
-					if isfile('flintv4/profiles/'..val..mainapi.Place..'.txt') and delfile then
-						delfile('flintv4/profiles/'..val..mainapi.Place..'.txt')
+					if isfile('skidv5/profiles/'..val..mainapi.Place..'.txt') and delfile then
+						delfile('skidv5/profiles/'..val..mainapi.Place..'.txt')
 					end
 				end
 			else

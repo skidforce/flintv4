@@ -15,7 +15,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function() 
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..select(1, path:gsub('flintv4/', '')), true) 
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/'..select(1, path:gsub('skidv5/', '')), true) 
 		end)
 		if not suc or res == '404: Not Found' then 
 			error(res) 
@@ -29,15 +29,15 @@ local function downloadFile(path, func)
 end
 
 vape.Place = 8768229691
-if isfile('flintv4/games/'..vape.Place..'.lua') then
-	loadstring(readfile('flintv4/games/'..vape.Place..'.lua'), 'skywars')()
+if isfile('skidv5/games/'..vape.Place..'.lua') then
+	loadstring(readfile('skidv5/games/'..vape.Place..'.lua'), 'skywars')()
 else
-	if not shared.FlintV4Developer then
+	if not shared.SkidV5Developer then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/'..vape.Place..'.lua', true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/games/'..vape.Place..'.lua', true)
 		end)
 		if suc and res ~= '404: Not Found' then
-			loadstring(downloadFile('flintv4/games/'..vape.Place..'.lua'), 'skywars')()
+			loadstring(downloadFile('skidv5/games/'..vape.Place..'.lua'), 'skywars')()
 		end
 	end
 end

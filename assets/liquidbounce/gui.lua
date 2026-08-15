@@ -64,17 +64,17 @@ local uipallet = {
 }
 
 local getcustomassets = {
-	['flintv4/assets/liquidbounce/blatant.png'] = 'rbxasset://liquidbounce/blatant.png',
-	['flintv4/assets/liquidbounce/combat.png'] = 'rbxasset://liquidbounce/combat.png',
-	['flintv4/assets/liquidbounce/expand.png'] = 'rbxasset://liquidbounce/expand.png',
-	['flintv4/assets/liquidbounce/inventory.png'] = 'rbxasset://liquidbounce/inventory.png',
-	['flintv4/assets/liquidbounce/logo.png'] = 'rbxasset://liquidbounce/logo.png',
-	['flintv4/assets/liquidbounce/minigames.png'] = 'rbxasset://liquidbounce/minigames.png',
-	['flintv4/assets/liquidbounce/render.png'] = 'rbxasset://liquidbounce/render.png',
-	['flintv4/assets/liquidbounce/textgui.png'] = 'rbxasset://liquidbounce/textgui.png',
-	['flintv4/assets/liquidbounce/utility.png'] = 'rbxasset://liquidbounce/utility.png',
-	['flintv4/assets/liquidbounce/world.png'] = 'rbxasset://liquidbounce/world.png',
-	['flintv4/assets/new/blur.png'] = 'rbxassetid://14898786664'
+	['skidv5/assets/liquidbounce/blatant.png'] = 'rbxasset://liquidbounce/blatant.png',
+	['skidv5/assets/liquidbounce/combat.png'] = 'rbxasset://liquidbounce/combat.png',
+	['skidv5/assets/liquidbounce/expand.png'] = 'rbxasset://liquidbounce/expand.png',
+	['skidv5/assets/liquidbounce/inventory.png'] = 'rbxasset://liquidbounce/inventory.png',
+	['skidv5/assets/liquidbounce/logo.png'] = 'rbxasset://liquidbounce/logo.png',
+	['skidv5/assets/liquidbounce/minigames.png'] = 'rbxasset://liquidbounce/minigames.png',
+	['skidv5/assets/liquidbounce/render.png'] = 'rbxasset://liquidbounce/render.png',
+	['skidv5/assets/liquidbounce/textgui.png'] = 'rbxasset://liquidbounce/textgui.png',
+	['skidv5/assets/liquidbounce/utility.png'] = 'rbxasset://liquidbounce/utility.png',
+	['skidv5/assets/liquidbounce/world.png'] = 'rbxasset://liquidbounce/world.png',
+	['skidv5/assets/new/blur.png'] = 'rbxassetid://14898786664'
 }
 
 local isfile = isfile or function(file)
@@ -99,7 +99,7 @@ local function addBlur(parent)
 	blur.Size = UDim2.new(1, 42, 1, 42)
 	blur.Position = UDim2.fromOffset(-24, -15)
 	blur.BackgroundTransparency = 1
-	blur.Image = getcustomasset('flintv4/assets/new/blur.png')
+	blur.Image = getcustomasset('skidv5/assets/new/blur.png')
 	blur.ScaleType = Enum.ScaleType.Slice
 	blur.SliceCenter = Rect.new(44, 38, 804, 595)
 	blur.Parent = parent
@@ -174,7 +174,7 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		createDownloader(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/'..select(1, path:gsub('flintv4/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/pistonware/pistonware/main/'..select(1, path:gsub('skidv5/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -261,19 +261,19 @@ end
 
 local function writeFont()
 	if not assetfunction then return 'rbxasset://fonts/inter.json' end
-	--[[writefile('flintv4/assets/liquidbounce/lbfont.json', httpService:JSONEncode({
+	--[[writefile('skidv5/assets/liquidbounce/lbfont.json', httpService:JSONEncode({
 		name = 'Inter',
 		faces = {
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/liquidbounce/Inter-Light.ttf'), name = 'Light', weight = 300},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/liquidbounce/Inter-Regular.ttf'), name = 'Regular', weight = 400},
-			{style = 'normal', assetId = getcustomasset('flintv4/assets/liquidbounce/Inter-Medium.ttf'), name = 'Medium', weight = 500}
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/liquidbounce/Inter-Light.ttf'), name = 'Light', weight = 300},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/liquidbounce/Inter-Regular.ttf'), name = 'Regular', weight = 400},
+			{style = 'normal', assetId = getcustomasset('skidv5/assets/liquidbounce/Inter-Medium.ttf'), name = 'Medium', weight = 500}
 		}
 	}))]]
-	return getcustomasset('flintv4/assets/liquidbounce/lbfont.json')
+	return getcustomasset('skidv5/assets/liquidbounce/lbfont.json')
 end
 
 if inputService.TouchEnabled then
-	writefile('flintv4/profiles/gui.txt', 'new')
+	writefile('skidv5/profiles/gui.txt', 'new')
 	return
 end
 
@@ -283,7 +283,7 @@ do
 	uipallet.FontSemiBold = Font.new(lbfont, Enum.FontWeight.Medium)
 	uipallet.FontLight = Font.new(lbfont, Enum.FontWeight.Light)
 
-	local res = isfile('flintv4/profiles/color.txt') and loadJson('flintv4/profiles/color.txt')
+	local res = isfile('skidv5/profiles/color.txt') and loadJson('skidv5/profiles/color.txt')
 	if res then
 		uipallet.Main = res.Main and Color3.fromRGB(unpack(res.Main)) or uipallet.Main
 		uipallet.Text = res.Text and Color3.fromRGB(unpack(res.Text)) or uipallet.Text
@@ -525,7 +525,7 @@ function mainapi:CreateCategory(categorysettings)
 		expandicon.Position = UDim2.new(1, -20, 0.5, 0)
 		expandicon.AnchorPoint = Vector2.new(0.5, 0.5)
 		expandicon.BackgroundTransparency = 1
-		expandicon.Image = getcustomasset('flintv4/assets/liquidbounce/expand.png')
+		expandicon.Image = getcustomasset('skidv5/assets/liquidbounce/expand.png')
 		expandicon.ImageTransparency = 0.5
 		expandicon.Parent = modulebutton
 		local modulechildren = Instance.new('Frame')
@@ -810,37 +810,37 @@ end))
 
 mainapi:CreateCategory({
 	Name = 'Combat',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/combat.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/combat.png'),
 	Size = UDim2.fromOffset(16, 15)
 })
 mainapi:CreateCategory({
 	Name = 'Blatant',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/blatant.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/blatant.png'),
 	Size = UDim2.fromOffset(15, 15)
 })
 mainapi:CreateCategory({
 	Name = 'Render',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/render.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/render.png'),
 	Size = UDim2.fromOffset(15, 9)
 })
 mainapi:CreateCategory({
 	Name = 'Utility',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/utility.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/utility.png'),
 	Size = UDim2.fromOffset(15, 15)
 })
 mainapi:CreateCategory({
 	Name = 'World',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/world.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/world.png'),
 	Size = UDim2.fromOffset(15, 15)
 })
 mainapi:CreateCategory({
 	Name = 'Inventory',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/inventory.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/inventory.png'),
 	Size = UDim2.fromOffset(14, 15)
 })
 mainapi:CreateCategory({
 	Name = 'Minigames',
-	Icon = getcustomasset('flintv4/assets/liquidbounce/minigames.png'),
+	Icon = getcustomasset('skidv5/assets/liquidbounce/minigames.png'),
 	Size = UDim2.fromOffset(15, 15)
 })
 

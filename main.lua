@@ -4,8 +4,8 @@
 -- reinject buttons -- and both re-establish that state first, so reaching here without it means
 -- the gate was skipped. Checked before the uninject below, so a failed check cannot tear down a
 -- working instance on its way out.
-if not shared.FlintV4Authenticated then
-	warn('[flintv4] not authenticated -- run the pistonware loader and enter your key')
+if not shared.SkidV5Authenticated then
+	warn('[skidv5] not authenticated -- run the pistonware loader and enter your key')
 	return
 end
 
@@ -18,7 +18,7 @@ local vape
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err and vape then
-		vape:CreateNotification('FlintV4', 'Failed to load : '..err, 30, 'alert')
+		vape:CreateNotification('SkidV5', 'Failed to load : '..err, 30, 'alert')
 	end
 	return res
 end
@@ -59,7 +59,7 @@ local function downloadFile(path, func)
 		-- bedwars.lua only exists in the GitLab repo (kept separate/obfuscated there), at that
 		-- repo's ROOT even though it caches locally under games/; everything else lives in the
 		-- GitHub repo.
-		local relPath = select(1, path:gsub('flintv4/', ''))
+		local relPath = select(1, path:gsub('skidv5/', ''))
 		local isBedwars = relPath == 'games/bedwars.lua'
 		-- Retried a few times: raw file hosts intermittently fail, returning an empty body that
 		-- would otherwise get cached as a corrupt/empty file.
@@ -67,9 +67,9 @@ local function downloadFile(path, func)
 		for attempt = 1, 4 do
 			local suc, res = pcall(function()
 				if isBedwars then
-					return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua', true)
+					return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/games/bedwars.lua', true)
 				end
-				return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/'..relPath, true)
+				return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/'..relPath, true)
 			end)
 			-- For .lua files, a compile check too: an outage can hand back the 503/error page
 			-- as the body, and caching that would poison the install silently (cache-first
@@ -99,7 +99,7 @@ local downloaderGui, downloaderLabel
 local function updateDownloader(text)
 	if not downloaderGui then
 		downloaderGui = Instance.new('ScreenGui')
-		downloaderGui.Name = 'FlintV4Downloader'
+		downloaderGui.Name = 'SkidV5Downloader'
 		downloaderGui.ResetOnSpawn = false
 		downloaderGui.Parent = cloneref(game:GetService('CoreGui'))
 		downloaderLabel = Instance.new('TextLabel')
@@ -123,7 +123,7 @@ end
 -- so GUI construction reads already-cached files instead of blocking on ~190 sequential round trips.
 local function prefetchFolder(folder)
 	local reqSuc, res = pcall(function()
-		return game:HttpGet('https://api.github.com/repos/skidforce/flintv4/contents/'..folder, true)
+		return game:HttpGet('https://api.github.com/repos/skidforce/skidv5/contents/'..folder, true)
 	end)
 	if not (reqSuc and res and res ~= '404: Not Found') then return end
 	local bodySuc, body = pcall(function()
@@ -135,7 +135,7 @@ local function prefetchFolder(folder)
 	for _, v in body do
 		-- hasContent, not isfile: a truncated asset from an interrupted prefetch must be picked
 		-- up again here rather than skipped forever. See the note on hasContent.
-		if v.type == 'file' and not hasContent('flintv4/'..folder..'/'..v.name) then
+		if v.type == 'file' and not hasContent('skidv5/'..folder..'/'..v.name) then
 			table.insert(toFetch, v.name)
 		end
 	end
@@ -165,7 +165,7 @@ local function prefetchFolder(folder)
 				nextIndex += 1
 				if index > total then break end
 
-				pcall(downloadFile, 'flintv4/'..folder..'/'..toFetch[index])
+				pcall(downloadFile, 'skidv5/'..folder..'/'..toFetch[index])
 				completed += 1
 				-- pcall'd and after the counter: if this ever threw, the worker would die
 				-- before releasing the wait below and the boot would hang on a GUI error
@@ -237,8 +237,8 @@ local function finishLoading()
 		-- bring everything up on defaults, and the Save below would write those defaults
 		-- back -- deleting the user's real config. Withholding the modules is the intended
 		-- consequence of a refusal; deleting configs is not, so do neither here.
-		if shared.FlintV4SessionRejected then
-			warn('[flintv4] session was not authorised -- leaving profiles untouched')
+		if shared.SkidV5SessionRejected then
+			warn('[skidv5] session was not authorised -- leaving profiles untouched')
 			return
 		end
 		vape:Load(nil, customProfile)
@@ -254,11 +254,11 @@ local function finishLoading()
 		-- Catching the flag only once per cycle would leave up to ten seconds in which this
 		-- loop could persist that switched-off state over a good config.
 		task.spawn(function()
-			while vape.Loaded and not shared.FlintV4SessionRejected do
+			while vape.Loaded and not shared.SkidV5SessionRejected do
 				vape:Save()
 				for _ = 1, 10 do
 					task.wait(1)
-					if not vape.Loaded or shared.FlintV4SessionRejected then break end
+					if not vape.Loaded or shared.SkidV5SessionRejected then break end
 				end
 			end
 		end)
@@ -270,7 +270,7 @@ local function finishLoading()
 	-- There are exactly two ways that finish is observable, and no third:
 	--   * an ordinary game script RETURNS, which sets gameScriptFinished
 	--   * BedWars pulls in a LuaArmor-protected payload which never returns (the VM keeps the
-	--     thread it was invoked on), so bedwars.lua sets shared.FlintV4BedwarsLoaded as its
+	--     thread it was invoked on), so bedwars.lua sets shared.SkidV5BedwarsLoaded as its
 	--     final statement
 	--
 	-- An earlier version tried to infer completion by watching the module count go quiet. It
@@ -287,14 +287,14 @@ local function finishLoading()
 		repeat
 			task.wait(0.1)
 		until gameScriptFinished
-			or shared.FlintV4BedwarsLoaded
+			or shared.SkidV5BedwarsLoaded
 			or os.clock() - started > 120
 		local count = 0
 		for _ in vape.Modules do count += 1 end
-		local how = shared.FlintV4BedwarsLoaded and 'payload signalled'
+		local how = shared.SkidV5BedwarsLoaded and 'payload signalled'
 			or gameScriptFinished and 'game script returned'
 			or 'TIMED OUT after 120s -- re-upload bedwars.lua to LuaArmor so it can signal when it is done'
-		warn(('[flintv4] %d modules in %.1fs (%s) -- applying profile'):format(count, os.clock() - started, how))
+		warn(('[skidv5] %d modules in %.1fs (%s) -- applying profile'):format(count, os.clock() - started, how))
 	end
 
 	if gameScriptFinished then
@@ -317,11 +317,11 @@ local function finishLoading()
 			-- comes back reliably; the loader still runs on a manual execute.
 			local teleportScript = [[
 				shared.vapereload = true
-				local cached = isfile and isfile('flintv4/main.lua') and readfile('flintv4/main.lua')
+				local cached = isfile and isfile('skidv5/main.lua') and readfile('skidv5/main.lua')
 				if cached and cached ~= '' then
 					loadstring(cached, 'main')()
 				else
-					loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/main.lua', true), 'main')()
+					loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/main.lua', true), 'main')()
 				end
 			]]
 			-- Globals and shared do not survive a teleport, and the new server re-runs main.lua
@@ -331,10 +331,10 @@ local function finishLoading()
 			-- %q so a key containing a quote or backslash still produces a valid chunk.
 			if shared.PistonwareKey then
 				local quoted = string.format('%q', shared.PistonwareKey)
-				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\nshared.FlintV4Authenticated = true\n'..teleportScript
+				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\nshared.SkidV5Authenticated = true\n'..teleportScript
 			end
-			if shared.FlintV4Developer then
-				teleportScript = 'shared.FlintV4Developer = true\n'..teleportScript
+			if shared.SkidV5Developer then
+				teleportScript = 'shared.SkidV5Developer = true\n'..teleportScript
 			end
 			if shared.VapeSmoothBoot then
 				teleportScript = 'shared.VapeSmoothBoot = true\n'..teleportScript
@@ -356,15 +356,15 @@ local function finishLoading()
 				vape:Save()
 			end
 			if not hasQueueOnTeleport then
-				vape:CreateNotification('FlintV4', 'queue_on_teleport is not supported by your executor -- Vape will not re-inject automatically after this teleport (e.g. queueing into a match). You will need to re-run your loadstring manually.', 15, 'alert')
+				vape:CreateNotification('SkidV5', 'queue_on_teleport is not supported by your executor -- Vape will not re-inject automatically after this teleport (e.g. queueing into a match). You will need to re-run your loadstring manually.', 15, 'alert')
 			end
 			queue_on_teleport(teleportScript)
 		end
 	end))
 
-	if shared.FlintV4SyncResult then
-		vape:CreateNotification('FlintV4', shared.FlintV4SyncResult, 15, shared.FlintV4SyncResult:find('failed') and 'alert' or nil)
-		shared.FlintV4SyncResult = nil
+	if shared.SkidV5SyncResult then
+		vape:CreateNotification('SkidV5', shared.SkidV5SyncResult, 15, shared.SkidV5SyncResult:find('failed') and 'alert' or nil)
+		shared.SkidV5SyncResult = nil
 	end
 
 	if not shared.vapereload then
@@ -375,20 +375,20 @@ local function finishLoading()
 	end
 end
 
-	if not isfile('flintv4/profiles/gui.txt') then
-		writefile('flintv4/profiles/gui.txt', 'new')
+	if not isfile('skidv5/profiles/gui.txt') then
+		writefile('skidv5/profiles/gui.txt', 'new')
 	end
-	local gui = readfile('flintv4/profiles/gui.txt')
+	local gui = readfile('skidv5/profiles/gui.txt')
 
-	if not isfolder('flintv4/assets/'..gui) then
-		makefolder('flintv4/assets/'..gui)
+	if not isfolder('skidv5/assets/'..gui) then
+		makefolder('skidv5/assets/'..gui)
 	end
 	pcall(prefetchFolder, 'assets/'..gui)
 	if gui ~= 'new' then
 		pcall(prefetchFolder, 'assets/new')
 	end
 	destroyDownloader()
-	vape = loadstring(downloadFile('flintv4/guis/'..gui..'.lua'), 'gui')()
+	vape = loadstring(downloadFile('skidv5/guis/'..gui..'.lua'), 'gui')()
 	shared.vape = vape
 
 if not shared.VapeIndependent then
@@ -408,7 +408,7 @@ if not shared.VapeIndependent then
 	-- pcall'd: an error thrown while universal.lua *executes* would otherwise propagate out of
 	-- main.lua entirely, skipping the game script below and finishLoading() with it.
 	pcall(function()
-		loadstring(downloadFile('flintv4/games/universal.lua'), 'universal')()
+		loadstring(downloadFile('skidv5/games/universal.lua'), 'universal')()
 	end)
 
 	-- Started, never waited on. There is no deadline here by design: a deadline would only be a
@@ -437,11 +437,11 @@ if not shared.VapeIndependent then
 		-- Cleared per run, not just per session: shared survives a reinject, and a leftover true
 		-- from the previous injection would tell waitForModules the payload had already finished
 		-- before it had even started re-registering.
-		shared.FlintV4BedwarsLoaded = nil
+		shared.SkidV5BedwarsLoaded = nil
 		-- Same reasoning for the refusal flag: bedwars.lua sets it from a fresh verdict every
 		-- run, but a game script that never sets it at all (the lobby) would otherwise inherit
 		-- a true left behind by a revoked BedWars session and refuse to save profiles there.
-		shared.FlintV4SessionRejected = nil
+		shared.SkidV5SessionRejected = nil
 
 		-- Re-publish the key immediately before the game script runs. LuaArmor blanks the global
 		-- script_key once it has authenticated, so it is single-use per session and any later
@@ -470,27 +470,27 @@ if not shared.VapeIndependent then
 			-- instead of guessed at.
 			local elapsed = os.clock() - started
 			if elapsed > 5 then
-				warn(('[flintv4] %s finished in %.1fs -- its modules now have their saved settings'):format(chunkname, elapsed))
+				warn(('[skidv5] %s finished in %.1fs -- its modules now have their saved settings'):format(chunkname, elapsed))
 			end
 			if not ok then
-				warn('[flintv4] '..chunkname..' errored: '..tostring(err))
+				warn('[skidv5] '..chunkname..' errored: '..tostring(err))
 			end
 		end)
 	end
 
-	local gamePath = 'flintv4/games/'..game.PlaceId..'.lua'
+	local gamePath = 'skidv5/games/'..game.PlaceId..'.lua'
 	-- A cached-but-empty file is treated as missing and refetched: a truncated write from an
 	-- earlier failed download reads back as "present", and loadstring('') silently does
 	-- nothing -- indistinguishable from the game script never loading at all.
 	local cached = isfile(gamePath) and readfile(gamePath) or nil
 	if cached and cached:gsub('%s', '') ~= '' then
 		runGameScript(cached, tostring(game.PlaceId))
-	elseif not shared.FlintV4Developer then
+	elseif not shared.SkidV5Developer then
 		-- Single fetch (the old code requested this URL twice: once to probe, then again
 		-- inside downloadFile) and load straight from the response, so a stale/corrupt
 		-- cache file can't shadow what we just downloaded.
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/'..game.PlaceId..'.lua', true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/games/'..game.PlaceId..'.lua', true)
 		end)
 		if suc and res and res ~= '' and res ~= '404: Not Found' then
 			pcall(writefile, gamePath, '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res)

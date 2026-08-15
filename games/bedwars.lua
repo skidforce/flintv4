@@ -1,10 +1,10 @@
--- FlintV4 BedWars combat modules
+-- SkidV5 BedWars combat modules
 -- Loaded by 6872274481.lua via loadstring � must grab everything from globals/shared.
 
 local run = function(func)
 	local ok, err = pcall(func)
 	if not ok then
-		warn('[flintv4] bedwars module failed: '..tostring(err))
+		warn('[skidv5] bedwars module failed: '..tostring(err))
 	end
 end
 
@@ -181,7 +181,7 @@ run(function()
 							end
 						end
 					end)
-					if not ok then warn('[flintv4] killaura attack: '..tostring(err)) end
+					if not ok then warn('[skidv5] killaura attack: '..tostring(err)) end
 
 					pcall(function()
 						for i, v in Boxes do

@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/'..'main'..'/'..select(1, path:gsub('flintv4/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/'..'main'..'/'..select(1, path:gsub('skidv5/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -56,7 +56,7 @@ local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 local whitelist = vape.Libraries.whitelist
-local drawingactor = loadstring(downloadFile('flintv4/libraries/drawing.lua'), 'drawing')(...)
+local drawingactor = loadstring(downloadFile('skidv5/libraries/drawing.lua'), 'drawing')(...)
 local redline = {Teams = {}}
 local starttime = os.clock()
 local TargetStrafeVector
@@ -151,7 +151,7 @@ local function notif(...)
 end
 
 local function warningRoutine(hash)
-	local path = 'flintv4/profiles/agreementhash.txt'
+	local path = 'skidv5/profiles/agreementhash.txt'
 	if (isfile(path) and readfile(path) or '') ~= hash then
 		local box = Instance.new('TextLabel')
 		box.Size = UDim2.fromScale(1, 1)
@@ -193,7 +193,7 @@ if not select(1, ...) then
 
 		task.spawn(function()
 			repeat task.wait() until not shared.vape
-			local executionString = "loadfile('flintv4/main.lua')("..drawingactor..")"
+			local executionString = "loadfile('skidv5/main.lua')("..drawingactor..")"
 			for i, v in shared do
 				if type(v) == 'string' then
 					executionString = string.format("shared.%s = '%s'", i, v)..'\n'..executionString

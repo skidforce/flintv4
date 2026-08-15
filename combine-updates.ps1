@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Automatically combines updates from Pistonware and CatV6 into FlintV4.
+    Automatically combines updates from Pistonware and CatV6 into SkidV5.
 .DESCRIPTION
     Pulls latest from both upstream repos, merges new/updated files,
-    rebrands references, removes key systems, and pushes to FlintV4.
-    Protects FlintV4 custom files (bedwars.lua, prediction.lua, custom loader).
+    rebrands references, removes key systems, and pushes to SkidV5.
+    Protects SkidV5 custom files (bedwars.lua, prediction.lua, custom loader).
 .PARAMETER SkipPush
     Skip the final git push (for testing).
 .PARAMETER DryRun
@@ -22,8 +22,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$FLINTV4_DIR    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TEMP_DIR       = Join-Path $env:TEMP "flintv4-combine-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+$SKIDV5_DIR    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$TEMP_DIR       = Join-Path $env:TEMP "skidv5-combine-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 $PISTON_REPO    = "https://github.com/themagicpiston/pistonware.git"
 $CATV6_REPO     = "https://github.com/Maxlasertech/CatV6.git"
 
@@ -36,9 +36,10 @@ $CATV6_EXTRAS = @("guis/liquidbounce.lua", "guis/wurst.lua", "libraries/premium.
 # Folders to merge from both repos
 $MERGE_FOLDERS = @("games", "guis", "profiles", "libraries", "assets")
 
-# FlintV4 custom files that should NOT be overwritten by upstream
+# SkidV5 custom files that should NOT be overwritten by upstream
 # These are our modifications that diverge from both Pistonware and CatV6
 $PROTECTED_FILES = @(
+    "loader.lua",
     "games/bedwars.lua",
     "games/6872274481.lua",
     "games/6872265039.lua",
@@ -47,7 +48,7 @@ $PROTECTED_FILES = @(
 )
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  FlintV4 Auto-Combine Script" -ForegroundColor Cyan
+Write-Host "  SkidV5 Auto-Combine Script" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # === STEP 1: CLONE UPSTREAM REPOS ===
@@ -59,17 +60,21 @@ Write-Host "  Cloning CatV6..." -ForegroundColor Gray
 git clone --quiet $CATV6_REPO (Join-Path $TEMP_DIR "catv6") 2>&1 | Out-Null
 Write-Host "  Done.`n" -ForegroundColor Green
 
-# === STEP 2: PULL LATEST FLINTV4 ===
-Write-Host "[2/9] Pulling latest FlintV4..." -ForegroundColor Yellow
-Set-Location $FLINTV4_DIR
+# === STEP 2: PULL LATEST SKIDV5 ===
+Write-Host "[2/9] Pulling latest SkidV5..." -ForegroundColor Yellow
+Set-Location $SKIDV5_DIR
 git pull --quiet 2>&1 | Out-Null
 Write-Host "  Done.`n" -ForegroundColor Green
 
 # === STEP 3: COPY PISTONWARE BASE FILES ===
 Write-Host "[3/9] Updating Pistonware base files..." -ForegroundColor Yellow
 foreach ($file in $PISTON_BASE_FILES) {
+    if ($PROTECTED_FILES -contains $file) {
+        Write-Host "  Skipped (protected): $file" -ForegroundColor Gray
+        continue
+    }
     $src = Join-Path (Join-Path $TEMP_DIR "pistonware") $file
-    $dst = Join-Path $FLINTV4_DIR $file
+    $dst = Join-Path $SKIDV5_DIR $file
     if (Test-Path $src) {
         if (-not $DryRun) { Copy-Item $src $dst -Force }
         Write-Host "  $(if($DryRun){'[DRY] Would update'}else{'Updated'}): $file" -ForegroundColor Gray
@@ -81,7 +86,7 @@ Write-Host ""
 Write-Host "[4/9] Updating CatV6 extras..." -ForegroundColor Yellow
 foreach ($file in $CATV6_EXTRAS) {
     $src = Join-Path (Join-Path $TEMP_DIR "catv6") $file
-    $dst = Join-Path $FLINTV4_DIR $file
+    $dst = Join-Path $SKIDV5_DIR $file
     if (Test-Path $src) {
         $dstDir = Split-Path $dst -Parent
         if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
@@ -96,7 +101,7 @@ Write-Host "[5/9] Merging folders..." -ForegroundColor Yellow
 foreach ($folder in $MERGE_FOLDERS) {
     $pistonDir = Join-Path (Join-Path $TEMP_DIR "pistonware") $folder
     $catv6Dir  = Join-Path (Join-Path $TEMP_DIR "catv6") $folder
-    $flintDir  = Join-Path $FLINTV4_DIR $folder
+    $skidDir  = Join-Path $SKIDV5_DIR $folder
 
     $pistonFiles = @(); $catv6Files = @()
     if (Test-Path $pistonDir) {
@@ -116,7 +121,7 @@ foreach ($folder in $MERGE_FOLDERS) {
         }
         $pistonSrc = Join-Path $pistonDir $relPath
         $catv6Src  = Join-Path $catv6Dir $relPath
-        $dst       = Join-Path $flintDir $relPath
+        $dst       = Join-Path $skidDir $relPath
         $src = $null
         if (Test-Path $pistonSrc) { $src = $pistonSrc }
         elseif (Test-Path $catv6Src) { $src = $catv6Src }
@@ -135,48 +140,48 @@ Write-Host ""
 # === STEP 6: REBRAND ALL REFERENCES ===
 Write-Host "[6/9] Rebranding references..." -ForegroundColor Yellow
 if (-not $DryRun) {
-    $luaFiles = Get-ChildItem $FLINTV4_DIR -Recurse -Include "*.lua" | Where-Object { $_.FullName -notlike "*\.git*" }
+    $luaFiles = Get-ChildItem $SKIDV5_DIR -Recurse -Include "*.lua" | Where-Object { $_.FullName -notlike "*\.git*" }
     $rebrandCount = 0
     foreach ($file in $luaFiles) {
-        $relPath = $file.FullName.Substring($FLINTV4_DIR.Length).TrimStart("\", "/").Replace("\", "/")
+        $relPath = $file.FullName.Substring($SKIDV5_DIR.Length).TrimStart("\", "/").Replace("\", "/")
         if ($PROTECTED_FILES -contains $relPath) { continue }
         $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $content) { continue }
         $original = $content
 
         # URLs
-        $content = $content -replace 'themagicpiston/pistonware', 'skidforce/flintv4'
-        $content = $content -replace 'gitlab\.com/pistonware/pistonware/-/raw/main/bedwars\.lua', 'raw.githubusercontent.com/skidforce/flintv4/main/games/bedwars.lua'
-        $content = $content -replace 'codeberg\.org/pistonware/pistonware/raw/branch/main/', 'raw.githubusercontent.com/skidforce/flintv4/main/'
-        $content = $content -replace 'Maxlasertech/CatV6', 'skidforce/flintv4'
+        $content = $content -replace 'themagicpiston/pistonware', 'skidforce/skidv5'
+        $content = $content -replace 'gitlab\.com/pistonware/pistonware/-/raw/main/bedwars\.lua', 'raw.githubusercontent.com/skidforce/skidv5/main/games/bedwars.lua'
+        $content = $content -replace 'codeberg\.org/pistonware/pistonware/raw/branch/main/', 'raw.githubusercontent.com/skidforce/skidv5/main/'
+        $content = $content -replace 'Maxlasertech/CatV6', 'skidforce/skidv5'
         $content = $content -replace 'github\.com/Maxlasertech', 'github.com/skidforce'
 
         # Paths
-        $content = $content -replace "'pistonware/", "'flintv4/"
-        $content = $content -replace '"pistonware/', '"flintv4/'
-        $content = $content -replace 'catsix/', 'flintv4/'
-        $content = $content -replace "'catv6/", "'flintv4/"
-        $content = $content -replace '"catv6/', '"flintv4/'
+        $content = $content -replace "'pistonware/", "'skidv5/"
+        $content = $content -replace '"pistonware/', '"skidv5/'
+        $content = $content -replace 'catsix/', 'skidv5/'
+        $content = $content -replace "'catv6/", "'skidv5/"
+        $content = $content -replace '"catv6/', '"skidv5/'
 
         # Strings
-        $content = $content -replace '\[pistonware\]', '[flintv4]'
-        $content = $content -replace "'Pistonware'", "'FlintV4'"
-        $content = $content -replace '"Pistonware"', '"FlintV4"'
-        $content = $content -replace "'CatV6'", "'FlintV4'"
-        $content = $content -replace '"CatV6"', '"FlintV4"'
-        $content = $content -replace '\[CatV6\]', '[flintv4]'
-        $content = $content -replace 'PistonwareDownloader', 'FlintV4Downloader'
-        $content = $content -replace 'PistonwareLoaderBoot', 'FlintV4LoaderBoot'
-        $content = $content -replace 'PistonwareLoaderTeardown', 'FlintV4LoaderTeardown'
-        $content = $content -replace 'PistonwareLoader', 'FlintV4Loader'
-        $content = $content -replace 'PistonwareDeveloper', 'FlintV4Developer'
-        $content = $content -replace 'PistonwareSessionRejected', 'FlintV4SessionRejected'
-        $content = $content -replace 'PistonwareBedwarsLoaded', 'FlintV4BedwarsLoaded'
-        $content = $content -replace 'PistonwareSyncResult', 'FlintV4SyncResult'
-        $content = $content -replace 'PistonwareAuthenticated', 'FlintV4Authenticated'
+        $content = $content -replace '\[pistonware\]', '[skidv5]'
+        $content = $content -replace "'Pistonware'", "'SkidV5'"
+        $content = $content -replace '"Pistonware"', '"SkidV5"'
+        $content = $content -replace "'CatV6'", "'SkidV5'"
+        $content = $content -replace '"CatV6"', '"SkidV5"'
+        $content = $content -replace '\[CatV6\]', '[skidv5]'
+        $content = $content -replace 'PistonwareDownloader', 'SkidV5Downloader'
+        $content = $content -replace 'PistonwareLoaderBoot', 'SkidV5LoaderBoot'
+        $content = $content -replace 'PistonwareLoaderTeardown', 'SkidV5LoaderTeardown'
+        $content = $content -replace 'PistonwareLoader', 'SkidV5Loader'
+        $content = $content -replace 'PistonwareDeveloper', 'SkidV5Developer'
+        $content = $content -replace 'PistonwareSessionRejected', 'SkidV5SessionRejected'
+        $content = $content -replace 'PistonwareBedwarsLoaded', 'SkidV5BedwarsLoaded'
+        $content = $content -replace 'PistonwareSyncResult', 'SkidV5SyncResult'
+        $content = $content -replace 'PistonwareAuthenticated', 'SkidV5Authenticated'
 
         # CatV6 commit.txt fix
-        $content = $content -replace "readfile\('flintv4/profiles/commit\.txt'\)", "'main'"
+        $content = $content -replace "readfile\('skidv5/profiles/commit\.txt'\)", "'main'"
         $content = $content -replace "readfile\('catv6/profiles/commit\.txt'\)", "'main'"
 
         if ($content -ne $original) {
@@ -193,10 +198,10 @@ Write-Host ""
 # === STEP 7: REMOVE KEY SYSTEMS FROM GAME SCRIPTS ===
 Write-Host "[7/9] Removing key systems from game scripts..." -ForegroundColor Yellow
 if (-not $DryRun) {
-    $gameFiles = Get-ChildItem (Join-Path $FLINTV4_DIR "games") -Include "*.lua" -Recurse
+    $gameFiles = Get-ChildItem (Join-Path $SKIDV5_DIR "games") -Include "*.lua" -Recurse
     $keyRemoved = 0
     foreach ($file in $gameFiles) {
-        $relPath = $file.FullName.Substring($FLINTV4_DIR.Length).TrimStart("\", "/").Replace("\", "/")
+        $relPath = $file.FullName.Substring($SKIDV5_DIR.Length).TrimStart("\", "/").Replace("\", "/")
         if ($PROTECTED_FILES -contains $relPath) { continue }
         $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $content) { continue }
@@ -237,18 +242,27 @@ Write-Host ""
 
 # === STEP 8: BUMP VERSION ===
 Write-Host "[8/9] Bumping version..." -ForegroundColor Yellow
+$versionScript = Join-Path $SKIDV5_DIR "make-version.ps1"
 if (-not $DryRun) {
-    $version = Get-Date -Format "yyyyMMdd.HHmmss"
-    Set-Content (Join-Path $FLINTV4_DIR "version.txt") $version -NoNewline
-    Write-Host "  Version: $version" -ForegroundColor Gray
+    if (Test-Path $versionScript) {
+        $version = (& $versionScript) 2>&1 | Select-Object -Last 1
+        $version = ($version -split ": ")[-1].Trim()
+        if (-not $version) { $version = "unknown" }
+        Write-Host "  Version: $version" -ForegroundColor Gray
+    } else {
+        Write-Host "  make-version.ps1 not found, using timestamp" -ForegroundColor Gray
+        $version = Get-Date -Format "yyyyMMdd.HHmmss"
+        Set-Content (Join-Path $SKIDV5_DIR "version.txt") $version -NoNewline
+        Write-Host "  Version: $version" -ForegroundColor Gray
+    }
 } else {
-    Write-Host "  [DRY] Would bump version" -ForegroundColor Gray
+    Write-Host "  [DRY] Would bump version via make-version.ps1" -ForegroundColor Gray
 }
 Write-Host ""
 
 # === STEP 9: COMMIT & PUSH ===
 Write-Host "[9/9] Committing and pushing..." -ForegroundColor Yellow
-Set-Location $FLINTV4_DIR
+Set-Location $SKIDV5_DIR
 git add -A
 $changes = git diff --cached --stat
 if ($changes) {
@@ -275,6 +289,6 @@ Write-Host "`nCleaning up temp files..." -ForegroundColor Gray
 Remove-Item $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Done! FlintV4 is up to date." -ForegroundColor Green
-Write-Host "  Repo: https://github.com/skidforce/flintv4" -ForegroundColor Cyan
+Write-Host "  Done! SkidV5 is up to date." -ForegroundColor Green
+Write-Host "  Repo: https://github.com/skidforce/skidv5" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan

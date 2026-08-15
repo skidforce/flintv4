@@ -17,18 +17,18 @@ vape.Place = 6872274481
 -- setup (shared.bedwars, services, vape libs) lives in 6872274481.lua, which
 -- loads bedwars.lua itself once that's done -- loading bedwars.lua directly
 -- from here skips that setup and shared.bedwars is nil when it runs.
-local gamePath = 'flintv4/games/6872274481.lua'
+local gamePath = 'skidv5/games/6872274481.lua'
 local cached = isfile(gamePath) and readfile(gamePath) or nil
 if cached and cached:gsub('%s', '') ~= '' then
 	loadstring(cached, '6872274481')()
-elseif not shared.FlintV4Developer then
+elseif not shared.SkidV5Developer then
 	-- Fetched from GitHub: only bedwars.lua lives off-repo (on GitLab), and the old host's
 	-- stale copy of this file was being downloaded twice (once to probe for existence, then
 	-- again to save it).
 	local content
 	for attempt = 1, 4 do
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/skidforce/flintv4/main/games/6872274481.lua', true)
+			return game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/main/games/6872274481.lua', true)
 		end)
 		if suc and res and res ~= '' and res ~= '404: Not Found' then
 			content = res
