@@ -18014,6 +18014,109 @@ run(function()
 end)
 
 run(function()
+	local JadeInfFly
+	local BoostSpeed
+	local Duration
+	local FinalSpeed
+
+	local replicatedStorage = game:GetService('ReplicatedStorage')
+	local runService = game:GetService('RunService')
+	local playersService = game:GetService('Players')
+
+	local connections = {}
+	local boostActive = false
+	local endTime = 0
+	local heartbeatConnection
+
+	local function getHumanoid()
+		local char = playersService.LocalPlayer and playersService.LocalPlayer.Character
+		return char and char:FindFirstChildOfClass('Humanoid')
+	end
+
+	local function applyBoost()
+		local humanoid = getHumanoid()
+		if not humanoid then return end
+
+		boostActive = true
+		endTime = tick() + Duration.Value
+		humanoid.WalkSpeed = BoostSpeed.Value
+
+		if not heartbeatConnection or not heartbeatConnection.Connected then
+			heartbeatConnection = runService.Heartbeat:Connect(function()
+				local h = getHumanoid()
+				if not h then return end
+
+				if boostActive then
+					if tick() < endTime then
+						h.WalkSpeed = BoostSpeed.Value
+					else
+						boostActive = false
+						h.WalkSpeed = FinalSpeed.Value
+						heartbeatConnection:Disconnect()
+						heartbeatConnection = nil
+					end
+				end
+			end)
+		end
+	end
+
+	JadeInfFly = vape.Categories.Minigames:CreateModule({
+		Name = 'JadeInfFly',
+		Function = function(callback)
+			if callback then
+				local folder = replicatedStorage['events-@easy-games/game-core:shared/game-core-networking@getEvents.Events']
+				if not folder then return end
+
+				for _, child in folder:GetChildren() do
+					if child:IsA('RemoteEvent') then
+						connections[child] = child.OnClientEvent:Connect(function(targetModel, action)
+							if action == 'void_axe_jump' then
+								applyBoost()
+							end
+						end)
+					end
+				end
+			else
+				for _, connection in connections do
+					connection:Disconnect()
+				end
+				table.clear(connections)
+				if heartbeatConnection then
+					heartbeatConnection:Disconnect()
+					heartbeatConnection = nil
+				end
+				boostActive = false
+				local h = getHumanoid()
+				if h then h.WalkSpeed = FinalSpeed.Value end
+			end
+		end,
+		Tooltip = 'Turns the Void Axe jump into sustained flight'
+	})
+	BoostSpeed = JadeInfFly:CreateSlider({
+		Name = 'Boost Speed',
+		Min = 50,
+		Max = 200,
+		Default = 100,
+		Suffix = ' w/s'
+	})
+	Duration = JadeInfFly:CreateSlider({
+		Name = 'Boost Duration',
+		Min = 0.1,
+		Max = 5,
+		Default = 1.2,
+		Decimal = 10,
+		Suffix = 's'
+	})
+	FinalSpeed = JadeInfFly:CreateSlider({
+		Name = 'Final Speed',
+		Min = 1,
+		Max = 50,
+		Default = 23,
+		Suffix = ' w/s'
+	})
+end)
+
+run(function()
 	local AutoPickpocket
 	local Targets
 	local Range
