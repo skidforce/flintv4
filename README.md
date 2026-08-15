@@ -16,7 +16,3 @@ This project would not exist without these amazing open-source projects:
 loadstring(game:HttpGet("https://raw.githubusercontent.com/skidforce/skidv5/refs/heads/main/loader.lua", true))()
 ```
 
-## Updating
-
-Run `combine-updates.ps1` to pull the latest upstream changes, rebrand and push.
-Versions are managed with `make-version.ps1`.
