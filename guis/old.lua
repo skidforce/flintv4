@@ -4203,7 +4203,7 @@ scaleslider = topbar:CreateSlider({
 	Visible = false
 })
 mainapi.HideVapeButton = topbar:CreateToggle({
-	Name = 'Hide Pistonware Mobile Button',
+	Name = 'Hide SkidV5 Mobile Button',
 	Function = function(callback)
 		-- Drops the transparencies rather than flipping Visible. An invisible
 		-- GuiObject stops hit-testing in Roblox, so hiding the button used to take
@@ -4217,7 +4217,7 @@ mainapi.HideVapeButton = topbar:CreateToggle({
 			end
 		end
 	end,
-	Tooltip = 'Makes the Pistonware button invisible on mobile\nIt still opens the GUI when tapped'
+	Tooltip = 'Makes the SkidV5 button invisible on mobile\nIt still opens the GUI when tapped'
 })
 topbar:CreateDropdown({
 	Name = 'GUI Theme',
@@ -4341,7 +4341,7 @@ topbar:CreateButton({
 	Function = function()
 		loadstring(game:HttpGet('https://raw.githubusercontent.com/skidforce/skidv5/refs/heads/main/reinstall.lua', true))()
 	end,
-	Tooltip = 'Uninjects, deletes the pistonware folder and downloads everything again'
+	Tooltip = 'Uninjects, deletes the skidv5 folder and downloads everything again'
 })
 topbar:CreateBind()
 
