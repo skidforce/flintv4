@@ -1,9 +1,5 @@
 # SkidV5
 
-> [!NOTE]
-> This is only a passion project and is not meant to be used for gaining an advantage.
-> For a proper advantage-gaining experience, just use [Pistonware](https://github.com/themagicpiston/pistonware) or [CatV6](https://github.com/Maxlasertech/CatV6).
-
 A Roblox client for BedWars and more, based on Vape V4.
 
 ## Credits
@@ -20,3 +16,6 @@ This project would not exist without these amazing open-source projects:
 loadstring(game:HttpGet("https://raw.githubusercontent.com/skidforce/skidv5/refs/heads/main/loader.lua", true))()
 ```
 
+> [!NOTE]
+> This is only a passion project and is not meant to be used for gaining an advantage.
+> For a proper advantage-gaining experience, just use [Pistonware](https://github.com/themagicpiston/pistonware) or [CatV6](https://github.com/Maxlasertech/CatV6).
