@@ -47,12 +47,10 @@ run(function()
 	local ParticleColor2
 	local ParticleSize
 	local Face
-	local Silent
 	local SortMode
 	local SmoothRotation
 	local MultiSwing
 	local BypassMode
-	local JitterAmount
 	local Particles, Boxes, AttackDelay = {}, {}, tick()
 	local lastTargets = {}
 	local rotateAngle = 0
@@ -73,38 +71,6 @@ run(function()
 
 	local function getSwingReach()
 		return (bedwars.CombatConstant and bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE) or 14.4
-	end
-
-	local function getAimPos(target)
-		local pos = target.RootPart.Position
-		if BypassMode and BypassMode.Value == 'CFrame Jitter' then
-			local j = JitterAmount.Value
-			pos = pos + Vector3.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
-		end
-		return pos
-	end
-
-	local function canSwingHit(target)
-		if not (target and target.RootPart and target.Character and target.Character:IsDescendantOf(workspace)) then
-			return false
-		end
-		local origin = gameCamera.CFrame.Position
-		local delta = getAimPos(target) - origin
-		local reach = math.min(getSwingReach(), AttackRange.Value)
-		if delta.Magnitude < 0.001 or delta.Magnitude > reach then
-			return false
-		end
-		if Targets and Targets.Walls.Enabled then
-			local params = RaycastParams.new()
-			params.FilterType = Enum.RaycastFilterType.Exclude
-			params.FilterDescendantsInstances = {lplr.Character, gameCamera}
-			local res = workspace:Raycast(origin, delta.Unit * (delta.Magnitude + 2), params)
-			local hit = res and res.Instance
-			if not (hit and (hit == target.Character or hit:IsDescendantOf(target.Character))) then
-				return false
-			end
-		end
-		return true
 	end
 
 	local function canAttack(target)
@@ -159,7 +125,8 @@ run(function()
 		local delta = targetpos - selfpos
 		if delta.Magnitude < 0.001 then return end
 		local dir = delta.Unit
-		local pos = selfpos + dir * math.max(delta.Magnitude - 14.399, 0)
+		local reach = getSwingReach()
+		local pos = selfpos + dir * math.max(delta.Magnitude - (reach - 0.1), 0)
 		bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
 		store.attackReach = (delta.Magnitude * 100) // 1 / 100
 		store.attackReachUpdate = tick() + 1
@@ -270,25 +237,12 @@ run(function()
 												AttackDelay = AttackDelay + (math.random(0, 15) / 1000)
 											end
 
-if Silent.Enabled and attacked[swing] then
-											local target = attacked[swing].Entity
-											if canAttack(target) then
-												pcall(silentAttack, target)
-											end
-										else
-											local target = attacked[swing] and attacked[swing].Entity or (attacked[1] and attacked[1].Entity)
-											if canSwingHit(target) then
-												if BypassMode.Value == 'CFrame Jitter' then
-													local j = JitterAmount.Value
-													local oldCF = entitylib.character.RootPart.CFrame
-													entitylib.character.RootPart.CFrame = oldCF * CFrame.new(math.random(-j * 100, j * 100) / 100, 0, math.random(-j * 100, j * 100) / 100)
-													bedwars.SwordController:swingSwordAtMouse()
-													entitylib.character.RootPart.CFrame = oldCF
-												else
-													bedwars.SwordController:swingSwordAtMouse()
+if attacked[swing] then
+												local target = attacked[swing].Entity
+												if canAttack(target) then
+													pcall(silentAttack, target)
 												end
 											end
-										end
 										end
 									end
 								end
@@ -355,7 +309,7 @@ if Silent.Enabled and attacked[swing] then
 				table.clear(Particles)
 			end
 		end,
-		Tooltip = 'Attack players around you\nwithout aiming at them.\nSilent mode attacks the target directly.'
+		Tooltip = 'Attack players around you\nwithout aiming at them.'
 	})
 	Targets = Killaura:CreateTargets({Players = true, Walls = true})
 	CPS = Killaura:CreateTwoSlider({
@@ -400,11 +354,6 @@ if Silent.Enabled and attacked[swing] then
 		List = {'Distance', 'Health', 'Angle', 'None'},
 		Default = 'Distance'
 	})
-	Silent = Killaura:CreateToggle({
-		Name = 'Silent rotation',
-		Default = true,
-		Tooltip = 'Rotates attack direction without\nmoving your character visually'
-	})
 	SmoothRotation = Killaura:CreateToggle({
 		Name = 'Smooth rotation',
 		Tooltip = 'Smoothly rotates toward targets\ninstead of snapping instantly'
@@ -426,23 +375,9 @@ if Silent.Enabled and attacked[swing] then
 	})
 	BypassMode = Killaura:CreateDropdown({
 		Name = 'Bypass mode',
-		List = {'None', 'Random Delay', 'CFrame Jitter'},
+		List = {'None', 'Random Delay'},
 		Default = 'None',
-		Tooltip = 'Random Delay: adds random delays\nCFrame Jitter: small random position offsets',
-		Function = function(val)
-			JitterAmount.Object.Visible = val == 'CFrame Jitter'
-		end
-	})
-	JitterAmount = Killaura:CreateSlider({
-		Name = 'Jitter amount',
-		Min = 0.1,
-		Max = 2,
-		Default = 0.3,
-		Decimal = 10,
-		Visible = false,
-		Function = function(val)
-			JitterAmount.Object.Visible = BypassMode.Value == 'CFrame Jitter'
-		end
+		Tooltip = 'Random Delay: adds random delays between attacks'
 	})
 	Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
 	Killaura:CreateToggle({

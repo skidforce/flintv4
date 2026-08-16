@@ -6725,21 +6725,40 @@ end)
 	
 run(function()
 	local AntiCheat
+	local FlyCheck
+	local SpeedCheck
+	local ClickerCheck
+	local AuraCheck
 	local SpeedLimit
 	local FlyLimit
+	local ClickLimit
 	local CheckRange
 	local Notify
 	local lastSample = {}
 	local flagged = {}
+	local connections = {}
+	local swingStats = {}
+	local auraStreak = {}
 	local sampleInterval = 0.4
 
-	local function flag(ent, detail)
+	local function flag(ent, detail, script)
 		if not flagged[ent] or flagged[ent] < tick() - 5 then
 			flagged[ent] = tick()
 			if Notify.Value then
-				notif('AntiCheat', ((ent.Player and ent.Player.Name) or 'NPC')..' '..detail, 8, 'warning')
+				notif('AntiCheat', ((ent.Player and ent.Player.Name) or 'NPC')..' '..detail..' (likely '..script..')', 8, 'warning')
 			end
 		end
+	end
+
+	local function cleanup()
+		for _, conn in connections do
+			pcall(conn.Disconnect, conn)
+		end
+		table.clear(connections)
+		table.clear(lastSample)
+		table.clear(flagged)
+		table.clear(swingStats)
+		table.clear(auraStreak)
 	end
 
 	AntiCheat = vape.Categories.World:CreateModule({
@@ -6754,34 +6773,80 @@ run(function()
 						Part = 'RootPart',
 						Players = true,
 						NPCs = false,
-						Limit = 30
+						Limit = 40
 					})
 					local now = tick()
+
 					for _, ent in plrs do
 						pcall(function()
 							local root = ent.RootPart
 							local humanoid = ent.Humanoid
 							if not (root and humanoid and ent.Character and ent.Character:IsDescendantOf(workspace)) then return end
 
+							local animator = humanoid:FindFirstChildOfClass('Animator')
+							if animator and not connections[ent] then
+								local count = 0
+								connections[ent] = animator.AnimationPlayed:Connect(function()
+									count = count + 1
+								end)
+								swingStats[ent] = {Count = count}
+							end
+
 							local pos = root.Position
 							local sample = lastSample[ent]
-							lastSample[ent] = {Pos = pos, Time = now}
+							lastSample[ent] = {Pos = pos, Time = now, Look = root.CFrame.LookVector}
+							if not (sample and sample.Time ~= now) then return end
 
-							if sample and sample.Time ~= now then
-								local dt = math.max(now - sample.Time, 0.01)
-								local horizontal = Vector3.new(pos.X - sample.Pos.X, 0, pos.Z - sample.Pos.Z)
-								local hspeed = horizontal.Magnitude / dt
-								local vspeed = (pos.Y - sample.Pos.Y) / dt
+							local dt = math.max(now - sample.Time, 0.01)
+							local horizontal = Vector3.new(pos.X - sample.Pos.X, 0, pos.Z - sample.Pos.Z)
+							local hspeed = horizontal.Magnitude / dt
+							local vspeed = (pos.Y - sample.Pos.Y) / dt
+							local moveDir = horizontal.Magnitude > 0.5 and horizontal.Unit or nil
 
-								if hspeed > SpeedLimit.Value then
-									flag(ent, 'is moving too fast ('..math.floor(hspeed)..' studs/s)')
-								end
+							if SpeedCheck.Value and hspeed > SpeedLimit.Value then
+								flag(ent, 'is moving too fast ('..math.floor(hspeed)..' studs/s)', 'speed script')
+							end
 
+							if FlyCheck.Value then
 								local state = humanoid:GetState()
 								if state == Enum.HumanoidStateType.Flying then
-									flag(ent, 'is flying (Fly state)')
+									flag(ent, 'is flying (Fly state)', 'fly script')
 								elseif vspeed > FlyLimit.Value and state ~= Enum.HumanoidStateType.Jumping and state ~= Enum.HumanoidStateType.Seated then
-									flag(ent, 'is flying (ascending '..math.floor(vspeed)..' studs/s)')
+									flag(ent, 'is flying (ascending '..math.floor(vspeed)..' studs/s)', 'fly script')
+								end
+							end
+
+							if ClickerCheck.Value and swingStats[ent] then
+								local stats = swingStats[ent]
+								local cps = (stats.Count - (stats.Prev or stats.Count)) / dt
+								stats.Prev = stats.Count
+								if cps > ClickLimit.Value then
+									flag(ent, 'is clicking very fast ('..math.floor(cps)..' clicks/s)', 'auto-clicker')
+								end
+							end
+
+							if AuraCheck.Value and moveDir then
+								local look = (root.CFrame.LookVector * Vector3.new(1, 0, 1)).Unit
+								local nearest, nearestDist = nil, 60
+								for _, other in plrs do
+									if other == ent then continue end
+									local d = (other.RootPart.Position - pos).Magnitude
+									if d < nearestDist then
+										nearest = other
+										nearestDist = d
+									end
+								end
+								if nearest then
+									local toEnemy = (nearest.RootPart.Position - pos) * Vector3.new(1, 0, 1)
+									local enemyDir = toEnemy.Magnitude > 0.5 and toEnemy.Unit or nil
+									if enemyDir then
+										local facingEnemy = look:Dot(enemyDir) > 0.94
+										local fleeing = moveDir:Dot(enemyDir) < 0
+										auraStreak[ent] = facingEnemy and fleeing and ((auraStreak[ent] or 0) + 1) or 0
+										if auraStreak[ent] >= 3 then
+											flag(ent, 'is tracking targets while running away', 'killaura script')
+										end
+									end
 								end
 							end
 						end)
@@ -6794,11 +6859,10 @@ run(function()
 					end
 				until not AntiCheat.Enabled
 			else
-				table.clear(lastSample)
-				table.clear(flagged)
+				cleanup()
 			end
 		end,
-		Tooltip = 'Detects cheaters around you\nand notifies you when one is found'
+		Tooltip = 'Detects cheaters around you, identifies\ntheir script type and notifies you'
 	})
 	CheckRange = AntiCheat:CreateSlider({
 		Name = 'Range',
@@ -6820,6 +6884,29 @@ run(function()
 		Max = 100,
 		Default = 25,
 		Suffix = ' studs/s'
+	})
+	ClickLimit = AntiCheat:CreateSlider({
+		Name = 'Click limit',
+		Min = 10,
+		Max = 50,
+		Default = 16,
+		Suffix = ' clicks/s'
+	})
+	SpeedCheck = AntiCheat:CreateToggle({
+		Name = 'Speed detection',
+		Default = true
+	})
+	FlyCheck = AntiCheat:CreateToggle({
+		Name = 'Fly detection',
+		Default = true
+	})
+	ClickerCheck = AntiCheat:CreateToggle({
+		Name = 'Auto-clicker detection',
+		Default = true
+	})
+	AuraCheck = AntiCheat:CreateToggle({
+		Name = 'Killaura detection',
+		Default = true
 	})
 	Notify = AntiCheat:CreateToggle({
 		Name = 'Notify',
