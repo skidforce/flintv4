@@ -3983,13 +3983,14 @@ run(function()
 	local ESPLoop = {
 		Drawing2D = function()
 			for ent, EntityESP in Reference do
+				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						continue
+						return
 					end
 				end
 	
@@ -3997,7 +3998,7 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then continue end
+				if not rootVis then return end
 
 				local topPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight or 0, 0)).p)
 				local bottomPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -(ent.HipHeight or 0) - 1, 0)).p)
@@ -4029,17 +4030,19 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 						EntityESP.TextBKG.Position = EntityESP.Text.Position - Vector2.new(4 + (EntityESP.Text.TextBounds.X / 2), 0)
 					end
 				end
+				end)
 			end
 		end,
 		Drawing3D = function()
 			for ent, EntityESP in Reference do
+				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						continue
+						return
 					end
 				end
 	
@@ -4047,7 +4050,7 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then continue end
+				if not rootVis then return end
 	
 				local point1 = ESPWorldToViewport(ent.RootPart.Position + Vector3.new(1.5, ent.HipHeight, 1.5))
 				local point2 = ESPWorldToViewport(ent.RootPart.Position + Vector3.new(1.5, -ent.HipHeight, 1.5))
@@ -4081,17 +4084,19 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				EntityESP.Line11.To = point8
 				EntityESP.Line12.From = point8
 				EntityESP.Line12.To = point4
+				end)
 			end
 		end,
 		DrawingSkeleton = function()
 			for ent, EntityESP in Reference do
+				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						continue
+						return
 					end
 				end
 	
@@ -4099,11 +4104,10 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then continue end
+				if not rootVis then return end
 				
 				local rigcheck = ent.Humanoid.RigType == Enum.HumanoidRigType.R6
-				pcall(function()
-					local offset = rigcheck and CFrame.new(0, -0.8, 0) or CFrame.identity
+				local offset = rigcheck and CFrame.new(0, -0.8, 0) or CFrame.identity
 					local head = ESPWorldToViewport((ent.Head.CFrame).p)
 					local headfront = ESPWorldToViewport((ent.Head.CFrame * CFrame.new(0, 0, -0.5)).p)
 					local toplefttorso = ESPWorldToViewport((ent.Character[(rigcheck and 'Torso' or 'UpperTorso')].CFrame * CFrame.new(-1.5, 0.8, 0)).p)
@@ -6719,6 +6723,110 @@ run(function()
 	})
 end)
 	
+run(function()
+	local AntiCheat
+	local SpeedLimit
+	local FlyLimit
+	local CheckRange
+	local Notify
+	local lastSample = {}
+	local flagged = {}
+	local sampleInterval = 0.4
+
+	local function flag(ent, detail)
+		if not flagged[ent] or flagged[ent] < tick() - 5 then
+			flagged[ent] = tick()
+			if Notify.Value then
+				notif('AntiCheat', ((ent.Player and ent.Player.Name) or 'NPC')..' '..detail, 8, 'warning')
+			end
+		end
+	end
+
+	AntiCheat = vape.Categories.World:CreateModule({
+		Name = 'AntiCheat',
+		Function = function(callback)
+			if callback then
+				repeat
+					task.wait(sampleInterval)
+					if not entitylib.isAlive then continue end
+					local plrs = entitylib.AllPosition({
+						Range = CheckRange.Value,
+						Part = 'RootPart',
+						Players = true,
+						NPCs = false,
+						Limit = 30
+					})
+					local now = tick()
+					for _, ent in plrs do
+						pcall(function()
+							local root = ent.RootPart
+							local humanoid = ent.Humanoid
+							if not (root and humanoid and ent.Character and ent.Character:IsDescendantOf(workspace)) then return end
+
+							local pos = root.Position
+							local sample = lastSample[ent]
+							lastSample[ent] = {Pos = pos, Time = now}
+
+							if sample and sample.Time ~= now then
+								local dt = math.max(now - sample.Time, 0.01)
+								local horizontal = Vector3.new(pos.X - sample.Pos.X, 0, pos.Z - sample.Pos.Z)
+								local hspeed = horizontal.Magnitude / dt
+								local vspeed = (pos.Y - sample.Pos.Y) / dt
+
+								if hspeed > SpeedLimit.Value then
+									flag(ent, 'is moving too fast ('..math.floor(hspeed)..' studs/s)')
+								end
+
+								local state = humanoid:GetState()
+								if state == Enum.HumanoidStateType.Flying then
+									flag(ent, 'is flying (Fly state)')
+								elseif vspeed > FlyLimit.Value and state ~= Enum.HumanoidStateType.Jumping and state ~= Enum.HumanoidStateType.Seated then
+									flag(ent, 'is flying (ascending '..math.floor(vspeed)..' studs/s)')
+								end
+							end
+						end)
+					end
+
+					for ent in lastSample do
+						if now - lastSample[ent].Time > 3 then
+							lastSample[ent] = nil
+						end
+					end
+				until not AntiCheat.Enabled
+			else
+				table.clear(lastSample)
+				table.clear(flagged)
+			end
+		end,
+		Tooltip = 'Detects cheaters around you\nand notifies you when one is found'
+	})
+	CheckRange = AntiCheat:CreateSlider({
+		Name = 'Range',
+		Min = 10,
+		Max = 200,
+		Default = 50,
+		Suffix = ' studs'
+	})
+	SpeedLimit = AntiCheat:CreateSlider({
+		Name = 'Speed limit',
+		Min = 10,
+		Max = 100,
+		Default = 40,
+		Suffix = ' studs/s'
+	})
+	FlyLimit = AntiCheat:CreateSlider({
+		Name = 'Fly limit',
+		Min = 5,
+		Max = 100,
+		Default = 25,
+		Suffix = ' studs/s'
+	})
+	Notify = AntiCheat:CreateToggle({
+		Name = 'Notify',
+		Default = true
+	})
+end)
+
 run(function()
 	local MurderMystery
 	local murderer, sheriff, oldtargetable, oldgetcolor

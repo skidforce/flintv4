@@ -91,7 +91,7 @@ run(function()
 		local origin = gameCamera.CFrame.Position
 		local delta = getAimPos(target) - origin
 		local reach = math.min(getSwingReach(), AttackRange.Value)
-		if delta.Magnitude > reach then
+		if delta.Magnitude < 0.001 or delta.Magnitude > reach then
 			return false
 		end
 		if Targets and Targets.Walls.Enabled then
@@ -112,7 +112,7 @@ run(function()
 			return false
 		end
 		local delta = target.RootPart.Position - entitylib.character.RootPart.Position
-		if delta.Magnitude > AttackRange.Value then
+		if delta.Magnitude < 0.001 or delta.Magnitude > AttackRange.Value then
 			return false
 		end
 		if Targets and Targets.Walls.Enabled then
@@ -157,6 +157,7 @@ run(function()
 			end
 		end
 		local delta = targetpos - selfpos
+		if delta.Magnitude < 0.001 then return end
 		local dir = delta.Unit
 		local pos = selfpos + dir * math.max(delta.Magnitude - 14.399, 0)
 		bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
@@ -221,6 +222,23 @@ run(function()
 		Function = function(callback)
 			if callback then
 				lastTargets = {}
+				pcall(debug.setupvalue, bedwars.SwordController.playSwordEffect, 6, {
+					Controllers = {
+						ViewmodelController = {
+							isVisible = function()
+								return not Silent.Enabled
+							end,
+							playAnimation = function(...)
+								if not Silent.Enabled then
+									local args = table.pack(...)
+									pcall(function()
+										bedwars.ViewmodelController:playAnimation(table.unpack(args, 2))
+									end)
+								end
+							end
+						}
+					}
+				})
 				repeat
 					local attacked = {}
 					local ok, err = pcall(function()
@@ -348,6 +366,7 @@ if Silent.Enabled and attacked[swing] then
 				until not Killaura.Enabled
 			else
 				lastTargets = {}
+				pcall(debug.setupvalue, bedwars.SwordController.playSwordEffect, 6, bedwars.Knit)
 				for _, v in Boxes do pcall(function() v:Destroy() end) end
 				for _, v in Particles do pcall(function() v:Destroy() end) end
 				table.clear(Boxes)
