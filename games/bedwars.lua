@@ -222,23 +222,6 @@ run(function()
 		Function = function(callback)
 			if callback then
 				lastTargets = {}
-				pcall(debug.setupvalue, bedwars.SwordController.playSwordEffect, 6, {
-					Controllers = {
-						ViewmodelController = {
-							isVisible = function()
-								return not Silent.Enabled
-							end,
-							playAnimation = function(...)
-								if not Silent.Enabled then
-									local args = table.pack(...)
-									pcall(function()
-										bedwars.ViewmodelController:playAnimation(table.unpack(args, 2))
-									end)
-								end
-							end
-						}
-					}
-				})
 				repeat
 					local attacked = {}
 					local ok, err = pcall(function()
@@ -345,7 +328,7 @@ if Silent.Enabled and attacked[swing] then
 					end)
 
 					pcall(function()
-						if not Silent.Enabled and Face.Enabled and attacked[1] then
+						if Face.Enabled and attacked[1] then
 							local targetPos = attacked[1].Entity.RootPart.Position
 							local currentCF = entitylib.character.RootPart.CFrame
 							local targetLook = CFrame.lookAt(currentCF.Position, Vector3.new(targetPos.X, currentCF.Position.Y + 0.01, targetPos.Z))
@@ -366,7 +349,6 @@ if Silent.Enabled and attacked[swing] then
 				until not Killaura.Enabled
 			else
 				lastTargets = {}
-				pcall(debug.setupvalue, bedwars.SwordController.playSwordEffect, 6, bedwars.Knit)
 				for _, v in Boxes do pcall(function() v:Destroy() end) end
 				for _, v in Particles do pcall(function() v:Destroy() end) end
 				table.clear(Boxes)
