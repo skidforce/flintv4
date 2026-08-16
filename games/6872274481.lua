@@ -8356,15 +8356,22 @@ run(function()
 			return
 		end
 
-		local presetId = Presets[normalise(message)]
-		if not presetId then return end
-
 		local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
 		if not channel then return end
 
+		local presetId = Presets[normalise(message)]
+		if presetId then
+			task.spawn(function()
+				pcall(function()
+					channel:SendPresetAsync(presetId)
+				end)
+			end)
+			return
+		end
+
 		task.spawn(function()
 			pcall(function()
-				channel:SendPresetAsync(presetId)
+				channel:SendAsync(message)
 			end)
 		end)
 	end
@@ -8375,7 +8382,7 @@ run(function()
 			if callback then
 				AutoToxic:Clean(vapeEvents.MatchEndEvent.Event:Connect(function()
 					if GG.Enabled then
-						sendChat('Good game')
+						sendChat('gg but skidv5 owns everyone')
 					end
 				end))
 				AutoToxic:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
@@ -8437,6 +8444,11 @@ run(function()
 			end
 		end
 
+		table.sort(PresetNames)
+
+		for _, message in {'skidv5 owns everyone', 'skidv5 on top', 'skidv5 too easy', 'skidv5 owns you', 'gg but skidv5 owns everyone'} do
+			table.insert(PresetNames, message)
+		end
 		table.sort(PresetNames)
 
 		if savedKillMessage and table.find(PresetNames, savedKillMessage) then
