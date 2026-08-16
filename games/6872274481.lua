@@ -18019,50 +18019,46 @@ run(function()
 	local Duration
 	local FinalSpeed
 
-	local replicatedStorage = game:GetService('ReplicatedStorage')
-	local runService = game:GetService('RunService')
-	local playersService = game:GetService('Players')
-
 	local connections = {}
 	local boostActive = false
 	local endTime = 0
 	local heartbeatConnection
 
-	local function getHumanoid()
-		local char = playersService.LocalPlayer and playersService.LocalPlayer.Character
-		return char and char:FindFirstChildOfClass('Humanoid')
-	end
-
-	local function applyBoost()
-		local humanoid = getHumanoid()
-		if not humanoid then return end
-
-		boostActive = true
-		endTime = tick() + Duration.Value
-		humanoid.WalkSpeed = BoostSpeed.Value
-
-		if not heartbeatConnection or not heartbeatConnection.Connected then
-			heartbeatConnection = runService.Heartbeat:Connect(function()
-				local h = getHumanoid()
-				if not h then return end
-
-				if boostActive then
-					if tick() < endTime then
-						h.WalkSpeed = BoostSpeed.Value
-					else
-						boostActive = false
-						h.WalkSpeed = FinalSpeed.Value
-						heartbeatConnection:Disconnect()
-						heartbeatConnection = nil
-					end
-				end
-			end)
-		end
-	end
-
 	JadeInfFly = vape.Categories.Minigames:CreateModule({
 		Name = 'JadeInfFly',
 		Function = function(callback)
+			local function getHumanoid()
+				local char = playersService.LocalPlayer and playersService.LocalPlayer.Character
+				return char and char:FindFirstChildOfClass('Humanoid')
+			end
+
+			local function applyBoost()
+				local humanoid = getHumanoid()
+				if not humanoid then return end
+
+				boostActive = true
+				endTime = tick() + Duration.Value
+				humanoid.WalkSpeed = BoostSpeed.Value
+
+				if not heartbeatConnection or not heartbeatConnection.Connected then
+					heartbeatConnection = runService.Heartbeat:Connect(function()
+						local h = getHumanoid()
+						if not h then return end
+
+						if boostActive then
+							if tick() < endTime then
+								h.WalkSpeed = BoostSpeed.Value
+							else
+								boostActive = false
+								h.WalkSpeed = FinalSpeed.Value
+								heartbeatConnection:Disconnect()
+								heartbeatConnection = nil
+							end
+						end
+					end)
+				end
+			end
+
 			if callback then
 				local folder = replicatedStorage['events-@easy-games/game-core:shared/game-core-networking@getEvents.Events']
 				if not folder then return end

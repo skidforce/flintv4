@@ -3786,8 +3786,12 @@ run(function()
 	local methodused
 	
 	local function ESPWorldToViewport(pos)
-		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
-		return Vector2.new(newpos.X, newpos.Y)
+		local screen = gameCamera:WorldToScreenPoint(pos)
+		return Vector2.new(screen.X, screen.Y)
+	end
+
+	local function ESPFloor(v)
+		return Vector2.new(math.floor(v.X), math.floor(v.Y))
 	end
 	
 	local ESPAdded = {
@@ -3989,36 +3993,36 @@ run(function()
 					end
 				end
 	
-				local rootPos, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
+local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
 				if not rootVis then continue end
-	
-				local topPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight, 0)).p)
-				local bottomPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -ent.HipHeight - 1, 0)).p)
+
+				local topPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight or 0, 0)).p)
+				local bottomPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -(ent.HipHeight or 0) - 1, 0)).p)
 				local sizex, sizey = topPos.X - bottomPos.X, topPos.Y - bottomPos.Y
-				local posx, posy = (rootPos.X - sizex / 2),  ((rootPos.Y - sizey / 2))
-				EntityESP.Main.Position = Vector2.new(posx, posy) // 1
-				EntityESP.Main.Size = Vector2.new(sizex, sizey) // 1
+				local posx, posy = (rootPos.X - sizex / 2), (rootPos.Y - sizey / 2)
+				EntityESP.Main.Position = ESPFloor(Vector2.new(posx, posy))
+				EntityESP.Main.Size = ESPFloor(Vector2.new(sizex, sizey))
 				if EntityESP.Border then
-					EntityESP.Border.Position = Vector2.new(posx - 1, posy + 1) // 1
-					EntityESP.Border.Size = Vector2.new(sizex + 2, sizey - 2) // 1
-					EntityESP.Border2.Position = Vector2.new(posx + 1, posy - 1) // 1
-					EntityESP.Border2.Size = Vector2.new(sizex - 2, sizey + 2) // 1
+					EntityESP.Border.Position = ESPFloor(Vector2.new(posx - 1, posy + 1))
+					EntityESP.Border.Size = ESPFloor(Vector2.new(sizex + 2, sizey - 2))
+					EntityESP.Border2.Position = ESPFloor(Vector2.new(posx + 1, posy - 1))
+					EntityESP.Border2.Size = ESPFloor(Vector2.new(sizex - 2, sizey + 2))
 				end
 	
 				if EntityESP.HealthLine then
 					local healthposy = sizey * math.clamp(ent.Health / ent.MaxHealth, 0, 1)
 					EntityESP.HealthLine.Visible = ent.Health > 0
-					EntityESP.HealthLine.From = Vector2.new(posx - 6, posy + (sizey - (sizey - healthposy))) // 1
-					EntityESP.HealthLine.To = Vector2.new(posx - 6, posy) // 1
-					EntityESP.HealthBorder.From = Vector2.new(posx - 6, posy + 1) // 1
-					EntityESP.HealthBorder.To = Vector2.new(posx - 6, (posy + sizey) - 1) // 1
+					EntityESP.HealthLine.From = ESPFloor(Vector2.new(posx - 6, posy + (sizey - (sizey - healthposy))))
+					EntityESP.HealthLine.To = ESPFloor(Vector2.new(posx - 6, posy))
+					EntityESP.HealthBorder.From = ESPFloor(Vector2.new(posx - 6, posy + 1))
+					EntityESP.HealthBorder.To = ESPFloor(Vector2.new(posx - 6, (posy + sizey) - 1))
 				end
 	
 				if EntityESP.Text then
-					EntityESP.Text.Position = Vector2.new(posx + (sizex / 2), posy + (sizey - 28)) // 1
+					EntityESP.Text.Position = ESPFloor(Vector2.new(posx + (sizex / 2), posy + (sizey - 28)))
 					EntityESP.Drop.Position = EntityESP.Text.Position + Vector2.new(1, 1)
 					if EntityESP.TextBKG then
 						EntityESP.TextBKG.Size = EntityESP.Text.TextBounds + Vector2.new(8, 4)
@@ -4039,7 +4043,7 @@ run(function()
 					end
 				end
 	
-				local _, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
+				local _, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
@@ -4091,7 +4095,7 @@ run(function()
 					end
 				end
 	
-				local _, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
+				local _, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
@@ -5870,7 +5874,8 @@ run(function()
 		Name = 'Add current position',
 		Function = function()
 			if entitylib.isAlive then
-				local pos = entitylib.character.RootPart.Position // 1
+				local pos = entitylib.character.RootPart.Position
+				pos = Vector3.new(math.floor(pos.X), math.floor(pos.Y), math.floor(pos.Z))
 				List:ChangeValue(pos.X..','..pos.Y..','..pos.Z..'/Waypoint '..(#List.List + 1))
 			end
 		end
