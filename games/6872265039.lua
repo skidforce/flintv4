@@ -1,11 +1,10 @@
-local run = function(func) pcall(func) end
+if table.find({'Solara', 'Xeno'}, ({identifyexecutor()})[1]) then return false end
+local run = function(func) func() end
 local cloneref = cloneref or function(obj) return obj end
 
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local inputService = cloneref(game:GetService('UserInputService'))
-local runService = cloneref(game:GetService('RunService'))
-local coreGui = cloneref(game:GetService('CoreGui'))
 
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -38,6 +37,7 @@ run(function()
 	bedwars = setmetatable({
 		Client = Client,
 		CrateItemMeta = debug.getupvalue(Flamework.resolveDependency('client/controllers/global/reward-crate/crate-controller@CrateController').onStart, 3),
+		MilestoneRewards = require(replicatedStorage.TS.milestones.milestones).MilestoneRewards,
 		Store = require(lplr.PlayerScripts.TS.ui.store).ClientStore
 	}, {
 		__index = function(self, ind)
@@ -56,13 +56,9 @@ run(function()
 	end)
 end)
 
-for _, v in {'AntiRagdoll', 'TriggerBot', 'SilentAim', 'AutoRejoin', 'Rejoin', 'Disabler', 'Timer', 'ServerHop', 'MouseTP', 'MurderMystery', 'Swim', 'Jesus', 'Invisible', 'Desync', 'Waypoints', 'PlayerModel', 'Schematica'} do
-	vape:Remove(v)
-end
-
-for _, v in vape.Modules do
-	if v.Category == 'Combat' or v.Category == 'Minigames' then
-		vape:Remove(v)
+for i, v in vape.Modules do
+	if v.Category == 'Combat' then
+		vape:Remove(i)
 	end
 end
 
@@ -74,7 +70,6 @@ run(function()
 		Name = 'Sprint',
 		Function = function(callback)
 			if callback then
-				if inputService.TouchEnabled then pcall(function() lplr.PlayerGui.MobileUI['2'].Visible = false end) end
 				old = bedwars.SprintController.stopSprinting
 				bedwars.SprintController.stopSprinting = function(...)
 					local call = old(...)
@@ -84,7 +79,6 @@ run(function()
 				Sprint:Clean(entitylib.Events.LocalAdded:Connect(function() bedwars.SprintController:stopSprinting() end))
 				bedwars.SprintController:stopSprinting()
 			else
-				if inputService.TouchEnabled then pcall(function() lplr.PlayerGui.MobileUI['2'].Visible = true end) end
 				bedwars.SprintController.stopSprinting = old
 				bedwars.SprintController:stopSprinting()
 			end
@@ -92,11 +86,11 @@ run(function()
 		Tooltip = 'Sets your sprinting to true.'
 	})
 end)
-	
+
 run(function()
 	local AutoGamble
 	
-	AutoGamble = vape.Categories.Minigames:CreateModule({
+	AutoGamble = vape.Categories.Utility:CreateModule({
 		Name = 'AutoGamble',
 		Function = function(callback)
 			if callback then
@@ -129,195 +123,89 @@ run(function()
 		Tooltip = 'Automatically opens lucky crates, piston inspired!'
 	})
 end)
-run(function()
-	local DeviceSpoofer
-	local Device
-	local spoofedType
-	local realInputType
-	local realGetUserInputType
-
-	local function sendInputType(inputType)
-		bedwars.Client:Get('SendUserInputType'):SendToServer({
-			userInputType = inputType
-		})
-	end
-
-	local function resolveInputType()
-		if Device.Value == 'Random' then
-			local types = {'MOBILE', 'PC', 'GAMEPAD'}
-			return types[math.random(#types)]
-		end
-		return Device.Value:upper()
-	end
-
-	DeviceSpoofer = vape.Categories.Utility:CreateModule({
-		Name = 'DeviceSpoofer',
-		Function = function(callback)
-			if callback then
-				realInputType = bedwars.UserInputController:getUserInputType()
-				realGetUserInputType = bedwars.UserInputController.getUserInputType
-				spoofedType = resolveInputType()
-
-				bedwars.UserInputController.getUserInputType = function()
-					return spoofedType
-				end
-
-				sendInputType(spoofedType)
-			else
-				bedwars.UserInputController.getUserInputType = realGetUserInputType
-				sendInputType(realInputType)
-				realGetUserInputType = nil
-			end
-		end,
-		ExtraText = function()
-			if Device.Value == 'Random' then
-				return 'Random'..(spoofedType and ' ('..spoofedType..')' or '')
-			end
-			return Device.Value
-		end,
-		Tooltip = 'Spoofs the device you show up as to the server'
-	})
-
-	Device = DeviceSpoofer:CreateDropdown({
-		Name = 'Device',
-		List = {'Mobile', 'PC', 'Gamepad', 'Random'},
-		Function = function(value)
-			if DeviceSpoofer.Enabled then
-				spoofedType = resolveInputType()
-				sendInputType(spoofedType)
-			end
-		end
-	})
-end)
 
 run(function()
 	local ClaimRewards
-	local DailyReward
-	local ClaimAchievements
-	local Milestones
-
-	local achievement
-	local milestoneRewards
-	local dailyAttempted = false
-	local milestoneAttempts = {}
-	local nextProfileRefresh = 0
-
-	local function getAchievement()
-		if not achievement then
-			local folder = replicatedStorage.TS.achievement
-			achievement = {
-				Id = require(folder['achievement-id']).AchievementId,
-				Meta = require(folder['achievement-meta']).AchievementsMeta,
-				Util = require(folder['achievement-util']).AchievementUtil
-			}
-		end
-		return achievement
+	local CratesOnly
+	local Notify
+	
+	local function getClaimed()
+		local claimed = bedwars.MilestonesController.milestoneRewardsClaimed
+		if claimed then return claimed end
+		local state = bedwars.Store:getState().Bedwars
+		return state and state.milestoneRewardsClaimed or {}
 	end
-
-	local function getMilestones()
-		if not milestoneRewards then
-			milestoneRewards = require(replicatedStorage.TS.milestones.milestones).MilestoneRewards
-		end
-		return milestoneRewards
-	end
-
-	local function claimDaily()
-		local result = bedwars.Client:Get('DailyStoreRequestPurchase'):CallServer('BEDCOIN_100', 'Robux')
-		if type(result) == 'table' and result.success then
-			notif('ClaimRewards', 'Claimed the daily bedcoin reward', 5)
-		end
-	end
-
-	local function claimAchievements()
-		local data = getAchievement()
-
-		if os.clock() >= nextProfileRefresh then
-			nextProfileRefresh = os.clock() + 30
-			local profileData = bedwars.Client:Get('RequestProfileData'):CallServer(lplr)
-			if profileData then
-				bedwars.Store:dispatch({type = 'LobbySetProfileData', profileData = profileData})
-			end
-		end
-
-		local profileData = bedwars.Store:getState().Lobby.profileData
-		local achievements = profileData and profileData.achievements
-		if not achievements then return end
-
-		local claimed = 0
-		for _, id in data.Id do
-			local entry = achievements[id]
-			if entry and data.Meta[id] and data.Util.hasUnclaimedRewards(id, entry) then
-				bedwars.Client:Get('ClaimAchievementRewards'):SendToServer({id = id})
-				bedwars.Store:dispatch({type = 'LobbyClaimAchievementRewards', id = id})
-				claimed = claimed + 1
-				task.wait(0.2)
-			end
-		end
-
-		if claimed > 0 then
-			notif('ClaimRewards', 'Claimed '..claimed..' achievement reward'..(claimed == 1 and '' or 's'), 5)
-		end
-	end
-
-	local function claimMilestones()
-		local level = bedwars.Store:getState().Bedwars.playerLevel
-		local claimedList = bedwars.MilestonesController:getMilestoneRewardsClaimed()
-		if not (level and claimedList) then return end
-
-		for _, milestone in getMilestones() do
-			if level >= milestone.levelRequirement and not table.find(claimedList, milestone.id) and not milestoneAttempts[milestone.id] then
-				milestoneAttempts[milestone.id] = true
-				if bedwars.Client:Get('ClaimMilestoneReward'):CallServer(milestone.id) then
-					notif('ClaimRewards', 'Claimed milestone '..(milestone.description or milestone.id), 5)
-				end
-			end
-		end
-	end
-
-	ClaimRewards = vape.Categories.Minigames:CreateModule({
+	
+	ClaimRewards = vape.Categories.Utility:CreateModule({
 		Name = 'ClaimRewards',
 		Function = function(callback)
 			if callback then
-				dailyAttempted = false
-				nextProfileRefresh = 0
-				table.clear(milestoneAttempts)
-
 				repeat
-					if DailyReward and DailyReward.Enabled and not dailyAttempted then
-						dailyAttempted = true
-						pcall(claimDaily)
+					local level = bedwars.Store:getState().Bedwars.playerLevel or 0
+					local claimed = getClaimed()
+	
+					for _, reward in bedwars.MilestoneRewards do
+						if reward.levelRequirement <= level and not table.find(claimed, reward.id) and (not CratesOnly.Enabled or reward.instantClaim) then
+							if bedwars.Client:Get('ClaimMilestoneReward'):CallServer(reward.id) then
+								table.insert(claimed, reward.id)
+								if Notify.Enabled then
+									notif('ClaimRewards', `Claimed {reward.description or reward.id}`, 5)
+								end
+							end
+							task.wait(1)
+							if not ClaimRewards.Enabled then break end
+						end
 					end
-					if ClaimAchievements and ClaimAchievements.Enabled then
-						pcall(claimAchievements)
-					end
-					if Milestones and Milestones.Enabled then
-						pcall(claimMilestones)
-					end
+	
 					task.wait(5)
 				until not ClaimRewards.Enabled
 			end
 		end,
-		Tooltip = 'Automatically claims your daily reward, achievement rewards and level milestones.'
+		Tooltip = 'Automatically claims every level milestone reward as soon as you unlock it'
 	})
-
-	DailyReward = ClaimRewards:CreateToggle({
-		Name = 'Daily Reward',
+	CratesOnly = ClaimRewards:CreateToggle({
+		Name = 'Crates only',
+		Tooltip = 'Only claims the instant rewards like the lucky and diamond crates, leaves kits and cosmetics alone'
+	})
+	Notify = ClaimRewards:CreateToggle({
+		Name = 'Notify',
 		Default = true,
-		Function = function(state)
-			if not state then dailyAttempted = false end
+		Tooltip = 'Tells you what got claimed'
+	})
+end)
+
+run(function()
+	local DeviceSpoofer
+	local Device
+	local oldDevice, old
+	
+	DeviceSpoofer = vape.Categories.Utility:CreateModule({
+		Name = 'DeviceSpoofer',
+		Function = function(callback)
+			if callback then
+				oldDevice, old = bedwars.UserInputController:getUserInputType(), bedwars.UserInputController.getUserInputType
+				bedwars.UserInputController.getUserInputType = function()
+					return Device.Value:upper()
+				end
+				bedwars.Client:Get('SendUserInputType'):SendToServer({userInputType = Device.Value:upper()})
+			else
+				bedwars.UserInputController.getUserInputType = old
+				bedwars.Client:Get('SendUserInputType'):SendToServer({userInputType = oldDevice})
+				old = nil
+			end
 		end,
-		Tooltip = 'Claims the free daily store item (100 bedcoins) once per enable.'
+		Tooltip = 'Spoofs the device you show up as to the server',
+		ExtraText = function()
+			return Device.Value
+		end
 	})
-
-	ClaimAchievements = ClaimRewards:CreateToggle({
-		Name = 'Claim Achievements',
-		Default = true,
-		Tooltip = 'Claims the rewards of every achievement you have unlocked but not collected.'
-	})
-
-	Milestones = ClaimRewards:CreateToggle({
-		Name = 'Milestones',
-		Default = true,
-		Tooltip = 'Claims level milestone rewards as soon as they become available.'
+	Device = DeviceSpoofer:CreateDropdown({
+		Name = 'Device',
+		List = {'Mobile', 'PC', 'Gamepad'},
+		Function = function(val)
+			if DeviceSpoofer.Enabled then
+				bedwars.Client:Get('SendUserInputType'):SendToServer({userInputType = val:upper()})
+			end
+		end
 	})
 end)

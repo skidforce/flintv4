@@ -1235,6 +1235,13 @@ function vape:LoadGUI()
 		Icon = getvapeasset('skidv5/assets/new/utility.png'),
 		Size = UDim2.fromOffset(15, 14)
 	})
+	-- CatV6 renamed its Minigames grouping to Kits; the updated BedWars script registers every
+	-- kit module there, so the category must exist or those CreateModule calls index nil.
+	vape:CreateCategory({
+		Name = 'Kits',
+		Icon = getvapeasset('skidv5/assets/new/utility.png'),
+		Size = UDim2.fromOffset(15, 14)
+	})
 
 	-- games/6872274481.lua sizes two scrolling frames against the GUI's UIScale and reads it as
 	-- vape.guiscale, which the old GUI exported under that name. Same object, same field.
