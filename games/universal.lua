@@ -50,7 +50,19 @@ local contextService = cloneref(game:GetService('ContextActionService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 local proxService = cloneref(game:GetService('ProximityPromptService'))
 
-local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
+-- identifyexecutor exists but THROWS on several mobile executors, and this runs at the top
+-- level of the file -- so an unguarded call here does not degrade one feature, it kills the
+-- whole game script before a single module registers. main.lua already carries a comment
+-- saying exactly this about its own call; these three never got the same treatment, and this
+-- is the file BedWars users load.
+local function executorName()
+	local ok, name = pcall(function()
+		return identifyexecutor and ({identifyexecutor()})[1] or nil
+	end)
+	return (ok and type(name) == 'string') and name or ''
+end
+
+local isnetworkowner = table.find({'AWP', 'Nihon'}, executorName()) and isnetworkowner or function()
 	return true
 end
 local gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
@@ -3480,7 +3492,7 @@ run(function()
 			arrow.Visible = not rootVis
 			if rootVis then continue end
 	
-			local dir = (gameCamera.CFrame:PointToObjectSpace(ent.RootPart.Position) * Vector3.new(1, 0, 1)).Unit
+			local dir = CFrame.lookAlong(gameCamera.CFrame.Position, gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)):PointToObjectSpace(ent.RootPart.Position)
 			arrow.Rotation = math.deg(math.atan2(dir.Z, dir.X))
 		end
 	end
@@ -3786,12 +3798,8 @@ run(function()
 	local methodused
 	
 	local function ESPWorldToViewport(pos)
-		local screen = gameCamera:WorldToScreenPoint(pos)
-		return Vector2.new(screen.X, screen.Y)
-	end
-
-	local function ESPFloor(v)
-		return Vector2.new(math.floor(v.X), math.floor(v.Y))
+		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
+		return Vector2.new(newpos.X, newpos.Y)
 	end
 	
 	local ESPAdded = {
@@ -3983,74 +3991,71 @@ run(function()
 	local ESPLoop = {
 		Drawing2D = function()
 			for ent, EntityESP in Reference do
-				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						return
+						continue
 					end
 				end
 	
-local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
+				local rootPos, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then return end
-
-				local topPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight or 0, 0)).p)
-				local bottomPos = gameCamera:WorldToScreenPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -(ent.HipHeight or 0) - 1, 0)).p)
+				if not rootVis then continue end
+	
+				local topPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight, 0)).p)
+				local bottomPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -ent.HipHeight - 1, 0)).p)
 				local sizex, sizey = topPos.X - bottomPos.X, topPos.Y - bottomPos.Y
-				local posx, posy = (rootPos.X - sizex / 2), (rootPos.Y - sizey / 2)
-				EntityESP.Main.Position = ESPFloor(Vector2.new(posx, posy))
-				EntityESP.Main.Size = ESPFloor(Vector2.new(sizex, sizey))
+				local posx, posy = (rootPos.X - sizex / 2),  ((rootPos.Y - sizey / 2))
+				EntityESP.Main.Position = Vector2.new(posx, posy) // 1
+				EntityESP.Main.Size = Vector2.new(sizex, sizey) // 1
 				if EntityESP.Border then
-					EntityESP.Border.Position = ESPFloor(Vector2.new(posx - 1, posy + 1))
-					EntityESP.Border.Size = ESPFloor(Vector2.new(sizex + 2, sizey - 2))
-					EntityESP.Border2.Position = ESPFloor(Vector2.new(posx + 1, posy - 1))
-					EntityESP.Border2.Size = ESPFloor(Vector2.new(sizex - 2, sizey + 2))
+					EntityESP.Border.Position = Vector2.new(posx - 1, posy + 1) // 1
+					EntityESP.Border.Size = Vector2.new(sizex + 2, sizey - 2) // 1
+					EntityESP.Border2.Position = Vector2.new(posx + 1, posy - 1) // 1
+					EntityESP.Border2.Size = Vector2.new(sizex - 2, sizey + 2) // 1
 				end
 	
 				if EntityESP.HealthLine then
 					local healthposy = sizey * math.clamp(ent.Health / ent.MaxHealth, 0, 1)
 					EntityESP.HealthLine.Visible = ent.Health > 0
-					EntityESP.HealthLine.From = ESPFloor(Vector2.new(posx - 6, posy + (sizey - (sizey - healthposy))))
-					EntityESP.HealthLine.To = ESPFloor(Vector2.new(posx - 6, posy))
-					EntityESP.HealthBorder.From = ESPFloor(Vector2.new(posx - 6, posy + 1))
-					EntityESP.HealthBorder.To = ESPFloor(Vector2.new(posx - 6, (posy + sizey) - 1))
+					EntityESP.HealthLine.From = Vector2.new(posx - 6, posy + (sizey - (sizey - healthposy))) // 1
+					EntityESP.HealthLine.To = Vector2.new(posx - 6, posy) // 1
+					EntityESP.HealthBorder.From = Vector2.new(posx - 6, posy + 1) // 1
+					EntityESP.HealthBorder.To = Vector2.new(posx - 6, (posy + sizey) - 1) // 1
 				end
 	
 				if EntityESP.Text then
-					EntityESP.Text.Position = ESPFloor(Vector2.new(posx + (sizex / 2), posy + (sizey - 28)))
+					EntityESP.Text.Position = Vector2.new(posx + (sizex / 2), posy + (sizey - 28)) // 1
 					EntityESP.Drop.Position = EntityESP.Text.Position + Vector2.new(1, 1)
 					if EntityESP.TextBKG then
 						EntityESP.TextBKG.Size = EntityESP.Text.TextBounds + Vector2.new(8, 4)
 						EntityESP.TextBKG.Position = EntityESP.Text.Position - Vector2.new(4 + (EntityESP.Text.TextBounds.X / 2), 0)
 					end
 				end
-				end)
 			end
 		end,
 		Drawing3D = function()
 			for ent, EntityESP in Reference do
-				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						return
+						continue
 					end
 				end
 	
-				local _, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
+				local _, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then return end
+				if not rootVis then continue end
 	
 				local point1 = ESPWorldToViewport(ent.RootPart.Position + Vector3.new(1.5, ent.HipHeight, 1.5))
 				local point2 = ESPWorldToViewport(ent.RootPart.Position + Vector3.new(1.5, -ent.HipHeight, 1.5))
@@ -4084,30 +4089,29 @@ local rootPos, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
 				EntityESP.Line11.To = point8
 				EntityESP.Line12.From = point8
 				EntityESP.Line12.To = point4
-				end)
 			end
 		end,
 		DrawingSkeleton = function()
 			for ent, EntityESP in Reference do
-				pcall(function()
 				if Distance.Enabled then
 					local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 						for _, obj in EntityESP do
 							obj.Visible = false
 						end
-						return
+						continue
 					end
 				end
 	
-				local _, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
+				local _, rootVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position)
 				for _, obj in EntityESP do
 					obj.Visible = rootVis
 				end
-				if not rootVis then return end
+				if not rootVis then continue end
 				
 				local rigcheck = ent.Humanoid.RigType == Enum.HumanoidRigType.R6
-				local offset = rigcheck and CFrame.new(0, -0.8, 0) or CFrame.identity
+				pcall(function()
+					local offset = rigcheck and CFrame.new(0, -0.8, 0) or CFrame.identity
 					local head = ESPWorldToViewport((ent.Head.CFrame).p)
 					local headfront = ESPWorldToViewport((ent.Head.CFrame * CFrame.new(0, 0, -0.5)).p)
 					local toplefttorso = ESPWorldToViewport((ent.Character[(rigcheck and 'Torso' or 'UpperTorso')].CFrame * CFrame.new(-1.5, 0.8, 0)).p)
@@ -4855,7 +4859,7 @@ run(function()
 					end
 				end
 	
-				local headPos, headVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position + Vector3.new(0, ent.HipHeight + 1, 0))
+				local headPos, headVis = gameCamera:WorldToViewportPoint(ent.RootPart.Position + Vector3.new(0, ent.HipHeight + 1, 0))
 				nametag.Text.Visible = headVis
 				nametag.BG.Visible = headVis
 				if not headVis then
@@ -4870,8 +4874,8 @@ run(function()
 						Sizes[ent] = mag
 					end
 				end
-				nametag.BG.Position = Vector2.new(headPos.X - (nametag.BG.Size.X / 2), headPos.Y + (nametag.BG.Size.Y / 2))
-				nametag.Text.Position = nametag.BG.Position + Vector2.new(4, 2.5)
+				nametag.BG.Position = Vector2.new(headPos.X - (nametag.BG.Size.X / 2), headPos.Y - nametag.BG.Size.Y)
+				nametag.Text.Position = nametag.BG.Position + Vector2.new(4, 3)
 			end
 		end
 	}
@@ -5878,8 +5882,7 @@ run(function()
 		Name = 'Add current position',
 		Function = function()
 			if entitylib.isAlive then
-				local pos = entitylib.character.RootPart.Position
-				pos = Vector3.new(math.floor(pos.X), math.floor(pos.Y), math.floor(pos.Z))
+				local pos = entitylib.character.RootPart.Position // 1
 				List:ChangeValue(pos.X..','..pos.Y..','..pos.Z..'/Waypoint '..(#List.List + 1))
 			end
 		end
@@ -6724,197 +6727,6 @@ run(function()
 end)
 	
 run(function()
-	local AntiCheat
-	local FlyCheck
-	local SpeedCheck
-	local ClickerCheck
-	local AuraCheck
-	local SpeedLimit
-	local FlyLimit
-	local ClickLimit
-	local CheckRange
-	local Notify
-	local lastSample = {}
-	local flagged = {}
-	local connections = {}
-	local swingStats = {}
-	local auraStreak = {}
-	local sampleInterval = 0.4
-
-	local function flag(ent, detail, script)
-		if not flagged[ent] or flagged[ent] < tick() - 5 then
-			flagged[ent] = tick()
-			if Notify.Value then
-				notif('AntiCheat', ((ent.Player and ent.Player.Name) or 'NPC')..' '..detail..' (likely '..script..')', 8, 'warning')
-			end
-		end
-	end
-
-	local function cleanup()
-		for _, conn in connections do
-			pcall(conn.Disconnect, conn)
-		end
-		table.clear(connections)
-		table.clear(lastSample)
-		table.clear(flagged)
-		table.clear(swingStats)
-		table.clear(auraStreak)
-	end
-
-	AntiCheat = vape.Categories.World:CreateModule({
-		Name = 'AntiCheat',
-		Function = function(callback)
-			if callback then
-				repeat
-					task.wait(sampleInterval)
-					if not entitylib.isAlive then continue end
-					local plrs = entitylib.AllPosition({
-						Range = CheckRange.Value,
-						Part = 'RootPart',
-						Players = true,
-						NPCs = false,
-						Limit = 40
-					})
-					local now = tick()
-
-					for _, ent in plrs do
-						pcall(function()
-							local root = ent.RootPart
-							local humanoid = ent.Humanoid
-							if not (root and humanoid and ent.Character and ent.Character:IsDescendantOf(workspace)) then return end
-
-							local animator = humanoid:FindFirstChildOfClass('Animator')
-							if animator and not connections[ent] then
-								local count = 0
-								connections[ent] = animator.AnimationPlayed:Connect(function()
-									count = count + 1
-								end)
-								swingStats[ent] = {Count = count}
-							end
-
-							local pos = root.Position
-							local sample = lastSample[ent]
-							lastSample[ent] = {Pos = pos, Time = now, Look = root.CFrame.LookVector}
-							if not (sample and sample.Time ~= now) then return end
-
-							local dt = math.max(now - sample.Time, 0.01)
-							local horizontal = Vector3.new(pos.X - sample.Pos.X, 0, pos.Z - sample.Pos.Z)
-							local hspeed = horizontal.Magnitude / dt
-							local vspeed = (pos.Y - sample.Pos.Y) / dt
-							local moveDir = horizontal.Magnitude > 0.5 and horizontal.Unit or nil
-
-							if SpeedCheck.Value and hspeed > SpeedLimit.Value then
-								flag(ent, 'is moving too fast ('..math.floor(hspeed)..' studs/s)', 'speed script')
-							end
-
-							if FlyCheck.Value then
-								local state = humanoid:GetState()
-								if state == Enum.HumanoidStateType.Flying then
-									flag(ent, 'is flying (Fly state)', 'fly script')
-								elseif vspeed > FlyLimit.Value and state ~= Enum.HumanoidStateType.Jumping and state ~= Enum.HumanoidStateType.Seated then
-									flag(ent, 'is flying (ascending '..math.floor(vspeed)..' studs/s)', 'fly script')
-								end
-							end
-
-							if ClickerCheck.Value and swingStats[ent] then
-								local stats = swingStats[ent]
-								local cps = (stats.Count - (stats.Prev or stats.Count)) / dt
-								stats.Prev = stats.Count
-								if cps > ClickLimit.Value then
-									flag(ent, 'is clicking very fast ('..math.floor(cps)..' clicks/s)', 'auto-clicker')
-								end
-							end
-
-							if AuraCheck.Value and moveDir then
-								local look = (root.CFrame.LookVector * Vector3.new(1, 0, 1)).Unit
-								local nearest, nearestDist = nil, 60
-								for _, other in plrs do
-									if other == ent then continue end
-									local d = (other.RootPart.Position - pos).Magnitude
-									if d < nearestDist then
-										nearest = other
-										nearestDist = d
-									end
-								end
-								if nearest then
-									local toEnemy = (nearest.RootPart.Position - pos) * Vector3.new(1, 0, 1)
-									local enemyDir = toEnemy.Magnitude > 0.5 and toEnemy.Unit or nil
-									if enemyDir then
-										local facingEnemy = look:Dot(enemyDir) > 0.94
-										local fleeing = moveDir:Dot(enemyDir) < 0
-										auraStreak[ent] = facingEnemy and fleeing and ((auraStreak[ent] or 0) + 1) or 0
-										if auraStreak[ent] >= 3 then
-											flag(ent, 'is tracking targets while running away', 'killaura script')
-										end
-									end
-								end
-							end
-						end)
-					end
-
-					for ent in lastSample do
-						if now - lastSample[ent].Time > 3 then
-							lastSample[ent] = nil
-						end
-					end
-				until not AntiCheat.Enabled
-			else
-				cleanup()
-			end
-		end,
-		Tooltip = 'Detects cheaters around you, identifies\ntheir script type and notifies you'
-	})
-	CheckRange = AntiCheat:CreateSlider({
-		Name = 'Range',
-		Min = 10,
-		Max = 200,
-		Default = 50,
-		Suffix = ' studs'
-	})
-	SpeedLimit = AntiCheat:CreateSlider({
-		Name = 'Speed limit',
-		Min = 10,
-		Max = 100,
-		Default = 40,
-		Suffix = ' studs/s'
-	})
-	FlyLimit = AntiCheat:CreateSlider({
-		Name = 'Fly limit',
-		Min = 5,
-		Max = 100,
-		Default = 25,
-		Suffix = ' studs/s'
-	})
-	ClickLimit = AntiCheat:CreateSlider({
-		Name = 'Click limit',
-		Min = 10,
-		Max = 50,
-		Default = 16,
-		Suffix = ' clicks/s'
-	})
-	SpeedCheck = AntiCheat:CreateToggle({
-		Name = 'Speed detection',
-		Default = true
-	})
-	FlyCheck = AntiCheat:CreateToggle({
-		Name = 'Fly detection',
-		Default = true
-	})
-	ClickerCheck = AntiCheat:CreateToggle({
-		Name = 'Auto-clicker detection',
-		Default = true
-	})
-	AuraCheck = AntiCheat:CreateToggle({
-		Name = 'Killaura detection',
-		Default = true
-	})
-	Notify = AntiCheat:CreateToggle({
-		Name = 'Notify',
-		Default = true
-	})
-end)
-
-run(function()
 	local MurderMystery
 	local murderer, sheriff, oldtargetable, oldgetcolor
 	
@@ -7747,530 +7559,7 @@ run(function()
 			keys[keybutton] = nil
 		end
 	
-		local key = Instance.new('Frame')
-		key.Size = keybutton == Enum.KeyCode.Space and UDim2.new(0, 110, 0, 24) or UDim2.new(0, 34, 0, 36)
-		key.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-		key.BackgroundTransparency = 1 - Color.Opacity
-		key.Position = pos
-		key.Name = keybutton.Name
-		key.Parent = holder
-		local keytext = Instance.new('TextLabel')
-		keytext.BackgroundTransparency = 1
-		keytext.Size = UDim2.fromScale(1, 1)
-		keytext.Font = Enum.Font.Gotham
-		keytext.Text = text or keybutton.Name
-		keytext.TextXAlignment = Enum.TextXAlignment.Left
-		keytext.TextYAlignment = Enum.TextYAlignment.Top
-		keytext.Position = pos2
-		keytext.TextSize = keybutton == Enum.KeyCode.Space and 18 or 15
-		keytext.TextColor3 = Color3.new(1, 1, 1)
-		keytext.Parent = key
-		local corner = Instance.new('UICorner')
-		corner.CornerRadius = UDim.new(0, 4)
-		corner.Parent = key
-	
-		keys[keybutton] = {Key = key}
-	end
-	
-	local function updateKey(inputType)
-		local key = keys[inputType.KeyCode]
-		if key then
-			if key.Tween then
-				key.Tween:Cancel()
-			end
-	
-			if key.Tween2 then
-				key.Tween2:Cancel()
-			end
-	
-			local pressed = inputType.UserInputState == Enum.UserInputState.Begin
-			key.Pressed = pressed
-			key.Tween = tweenService:Create(key.Key, TweenInfo.new(0.1), {
-				BackgroundColor3 = pressed and Color3.new(1, 1, 1) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value),
-				BackgroundTransparency = pressed and 0 or 1 - Color.Opacity
-			})
-			key.Tween2 = tweenService:Create(key.Key.TextLabel, TweenInfo.new(0.1), {
-				TextColor3 = pressed and Color3.new() or Color3.new(1, 1, 1)
-			})
-			key.Tween:Play()
-			key.Tween2:Play()
-		end
-	end
-	
-	Keystrokes = vape.Legit:CreateModule({
-		Name = 'Keystrokes',
-		Function = function(callback)
-			if callback then
-				createKeystroke(Enum.KeyCode.W, UDim2.new(0, 38, 0, 0), UDim2.new(0, 6, 0, 5), Style.Value == 'Arrow' and '↑' or nil)
-				createKeystroke(Enum.KeyCode.S, UDim2.new(0, 38, 0, 42), UDim2.new(0, 8, 0, 5), Style.Value == 'Arrow' and '↓' or nil)
-				createKeystroke(Enum.KeyCode.A, UDim2.new(0, 0, 0, 42), UDim2.new(0, 7, 0, 5), Style.Value == 'Arrow' and '←' or nil)
-				createKeystroke(Enum.KeyCode.D, UDim2.new(0, 76, 0, 42), UDim2.new(0, 8, 0, 5), Style.Value == 'Arrow' and '→' or nil)
-	
-				Keystrokes:Clean(inputService.InputBegan:Connect(updateKey))
-				Keystrokes:Clean(inputService.InputEnded:Connect(updateKey))
-			end
-		end,
-		Size = UDim2.fromOffset(110, 176),
-		Tooltip = 'Shows movement keys onscreen'
-	})
-	holder = Instance.new('Frame')
-	holder.Size = UDim2.fromScale(1, 1)
-	holder.BackgroundTransparency = 1
-	holder.Parent = Keystrokes.Children
-	Style = Keystrokes:CreateDropdown({
-		Name = 'Key Style',
-		List = {'Keyboard', 'Arrow'},
-		Function = function()
-			if Keystrokes.Enabled then
-				Keystrokes:Toggle()
-				Keystrokes:Toggle()
-			end
-		end
-	})
-	Color = Keystrokes:CreateColorSlider({
-		Name = 'Color',
-		DefaultValue = 0,
-		DefaultOpacity = 0.5,
-		Function = function(hue, sat, val, opacity)
-			for _, v in keys do
-				if not v.Pressed then
-					v.Key.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-					v.Key.BackgroundTransparency = 1 - opacity
-				end
-			end
-		end
-	})
-	Keystrokes:CreateToggle({
-		Name = 'Show Spacebar',
-		Function = function(callback)
-			Keystrokes.Children.Size = UDim2.fromOffset(110, callback and 107 or 78)
-	
-			if callback then
-				createKeystroke(Enum.KeyCode.Space, UDim2.new(0, 0, 0, 83), UDim2.new(0, 25, 0, -10), '______')
-			else
-				keys[Enum.KeyCode.Space].Key:Destroy()
-				keys[Enum.KeyCode.Space] = nil
-			end
-		end,
-		Default = true
-	})
-end)
-	
-run(function()
-	local Memory
-	local label
-	
-	Memory = vape.Legit:CreateModule({
-		Name = 'Memory',
-		Function = function(callback)
-			if callback then
-				repeat
-					label.Text = math.floor(tonumber(game:GetService('Stats'):FindFirstChild('PerformanceStats').Memory:GetValue()))..' MB'
-					task.wait(1)
-				until not Memory.Enabled
-			end
-		end,
-		Size = UDim2.fromOffset(100, 41),
-		Tooltip = 'A label showing the memory currently used by roblox'
-	})
-	Memory:CreateFont({
-		Name = 'Font',
-		Blacklist = 'Gotham',
-		Function = function(val)
-			label.FontFace = val
-		end
-	})
-	Memory:CreateColorSlider({
-		Name = 'Color',
-		DefaultValue = 0,
-		DefaultOpacity = 0.5,
-		Function = function(hue, sat, val, opacity)
-			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-			label.BackgroundTransparency = 1 - opacity
-		end
-	})
-	label = Instance.new('TextLabel')
-	label.Size = UDim2.new(0, 100, 0, 41)
-	label.BackgroundTransparency = 0.5
-	label.TextSize = 15
-	label.Font = Enum.Font.Gotham
-	label.Text = '0 MB'
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.BackgroundColor3 = Color3.new()
-	label.Parent = Memory.Children
-	local corner = Instance.new('UICorner')
-	corner.CornerRadius = UDim.new(0, 4)
-	corner.Parent = label
-end)
-	
-run(function()
-	local Ping
-	local label
-	
-	Ping = vape.Legit:CreateModule({
-		Name = 'Ping',
-		Function = function(callback)
-			if callback then
-				repeat
-					label.Text = math.floor(tonumber(game:GetService('Stats'):FindFirstChild('PerformanceStats').Ping:GetValue()))..' ms'
-					task.wait(1)
-				until not Ping.Enabled
-			end
-		end,
-		Size = UDim2.fromOffset(100, 41),
-		Tooltip = 'Shows the current connection speed to the roblox server'
-	})
-	Ping:CreateFont({
-		Name = 'Font',
-		Blacklist = 'Gotham',
-		Function = function(val)
-			label.FontFace = val
-		end
-	})
-	Ping:CreateColorSlider({
-		Name = 'Color',
-		DefaultValue = 0,
-		DefaultOpacity = 0.5,
-		Function = function(hue, sat, val, opacity)
-			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-			label.BackgroundTransparency = 1 - opacity
-		end
-	})
-	label = Instance.new('TextLabel')
-	label.Size = UDim2.new(0, 100, 0, 41)
-	label.BackgroundTransparency = 0.5
-	label.TextSize = 15
-	label.Font = Enum.Font.Gotham
-	label.Text = '0 ms'
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.BackgroundColor3 = Color3.new()
-	label.Parent = Ping.Children
-	local corner = Instance.new('UICorner')
-	corner.CornerRadius = UDim.new(0, 4)
-	corner.Parent = label
-end)
-	
-run(function()
-	local SongBeats
-	local List
-	local FOV
-	local FOVValue = {}
-	local Volume
-	local alreadypicked = {}
-	local beattick = tick()
-	local oldfov, songobj, songbpm, songtween
-	
-	local function choosesong()
-		local list = List.ListEnabled
-		if #alreadypicked >= #list then
-			table.clear(alreadypicked)
-		end
-	
-		if #list <= 0 then
-			notif('SongBeats', 'no songs', 10)
-			SongBeats:Toggle()
-			return
-		end
-	
-		local chosensong = list[math.random(1, #list)]
-		if #list > 1 and table.find(alreadypicked, chosensong) then
-			repeat
-				task.wait()
-				chosensong = list[math.random(1, #list)]
-			until not table.find(alreadypicked, chosensong) or not SongBeats.Enabled
-		end
-		if not SongBeats.Enabled then return end
-	
-		local split = chosensong:split('/')
-		if not isfile(split[1]) then
-			notif('SongBeats', 'Missing song ('..split[1]..')', 10)
-			SongBeats:Toggle()
-			return
-		end
-	
-		songobj.SoundId = assetfunction(split[1])
-		repeat
-			task.wait()
-		until songobj.IsLoaded or not SongBeats.Enabled
-	
-		if SongBeats.Enabled then
-			beattick = tick() + (tonumber(split[3]) or 0)
-			songbpm = 60 / (tonumber(split[2]) or 50)
-			songobj:Play()
-		end
-	end
-	
-	SongBeats = vape.Legit:CreateModule({
-		Name = 'Song Beats',
-		Function = function(callback)
-			if callback then
-				songobj = Instance.new('Sound')
-				songobj.Volume = Volume.Value / 100
-				songobj.Parent = workspace
-				oldfov = gameCamera.FieldOfView
-	
-				repeat
-					if not songobj.Playing then
-						choosesong()
-					end
-	
-					if beattick < tick() and SongBeats.Enabled and FOV.Enabled then
-						beattick = tick() + songbpm
-						gameCamera.FieldOfView = oldfov - FOVValue.Value
-						songtween = tweenService:Create(gameCamera, TweenInfo.new(math.min(songbpm, 0.2), Enum.EasingStyle.Linear), {
-							FieldOfView = oldfov
-						})
-						songtween:Play()
-					end
-	
-					task.wait()
-				until not SongBeats.Enabled
-			else
-				if songobj then
-					songobj:Destroy()
-				end
-	
-				if songtween then
-					songtween:Cancel()
-				end
-	
-				if oldfov then
-					gameCamera.FieldOfView = oldfov
-				end
-	
-				table.clear(alreadypicked)
-			end
-		end,
-		Tooltip = 'Built in mp3 player'
-	})
-	List = SongBeats:CreateTextList({
-		Name = 'Songs',
-		Placeholder = 'filepath/bpm/start'
-	})
-	FOV = SongBeats:CreateToggle({
-		Name = 'Beat FOV',
-		Function = function(callback)
-			if FOVValue.Object then
-				FOVValue.Object.Visible = callback
-			end
-	
-			if SongBeats.Enabled then
-				SongBeats:Toggle()
-				SongBeats:Toggle()
-			end
-		end,
-		Default = true
-	})
-	FOVValue = SongBeats:CreateSlider({
-		Name = 'Adjustment',
-		Min = 1,
-		Max = 30,
-		Default = 5,
-		Darker = true
-	})
-	Volume = SongBeats:CreateSlider({
-		Name = 'Volume',
-		Function = function(val)
-			if songobj then
-				songobj.Volume = val / 100
-			end
-		end,
-		Min = 1,
-		Max = 100,
-		Default = 100,
-		Suffix = '%'
-	})
-end)
-	
-run(function()
-	local Speedmeter
-	local label
-	
-	Speedmeter = vape.Legit:CreateModule({
-		Name = 'Speedmeter',
-		Function = function(callback)
-			if callback then
-				repeat
-					local lastpos = entitylib.isAlive and entitylib.character.HumanoidRootPart.Position * Vector3.new(1, 0, 1) or Vector3.zero
-					local dt = task.wait(0.2)
-					local newpos = entitylib.isAlive and entitylib.character.HumanoidRootPart.Position * Vector3.new(1, 0, 1) or Vector3.zero
-					label.Text = math.round(((lastpos - newpos) / dt).Magnitude)..' sps'
-				until not Speedmeter.Enabled
-			end
-		end,
-		Size = UDim2.fromOffset(100, 41),
-		Tooltip = 'A label showing the average velocity in studs'
-	})
-	Speedmeter:CreateFont({
-		Name = 'Font',
-		Blacklist = 'Gotham',
-		Function = function(val)
-			label.FontFace = val
-		end
-	})
-	Speedmeter:CreateColorSlider({
-		Name = 'Color',
-		DefaultValue = 0,
-		DefaultOpacity = 0.5,
-		Function = function(hue, sat, val, opacity)
-			label.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-			label.BackgroundTransparency = 1 - opacity
-		end
-	})
-	label = Instance.new('TextLabel')
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 0.5
-	label.TextSize = 15
-	label.Font = Enum.Font.Gotham
-	label.Text = '0 sps'
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.BackgroundColor3 = Color3.new()
-	label.Parent = Speedmeter.Children
-	local corner = Instance.new('UICorner')
-	corner.CornerRadius = UDim.new(0, 4)
-	corner.Parent = label
-end)
-	
-run(function()
-	local TimeChanger
-	local Value
-	local old
-	
-	TimeChanger = vape.Legit:CreateModule({
-		Name = 'Time Changer',
-		Function = function(callback)
-			if callback then
-				old = lightingService.TimeOfDay
-				lightingService.TimeOfDay = Value.Value..':00:00'
-			else
-				lightingService.TimeOfDay = old
-				old = nil
-			end
-		end,
-		Tooltip = 'Change the time of the current world'
-	})
-	Value = TimeChanger:CreateSlider({
-		Name = 'Time',
-		Min = 0,
-		Max = 24,
-		Default = 12,
-		Function = function(val)
-			if TimeChanger.Enabled then 
-				lightingService.TimeOfDay = val..':00:00'
-			end
-		end
-	})
-end)
-
-run(function()
-    local Transparency
-    local sliders = {}
-    local HideArmor
-    local connection
-
-    local originalTransparency = {}
-
-    local parts = {
-        "Head",
-        "UpperTorso", "LowerTorso",
-        "LeftUpperArm", "LeftLowerArm", "LeftHand",
-        "RightUpperArm", "RightLowerArm", "RightHand",
-        "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-        "RightUpperLeg", "RightLowerLeg", "RightFoot"
-    }
-
-    local function getCharacter()
-        local char = entitylib.character
-        if typeof(char) == "table" then
-            if char.character then
-                char = char.character
-            elseif char.HumanoidRootPart then
-                char = char.HumanoidRootPart.Parent
-            end
-        end
-        return typeof(char) == "Instance" and cloneref(char) or nil
-    end
-
-    local function isArmor(name)
-        local lowered = name:lower()
-        return lowered:find("helmet") or lowered:find("chestplate") or lowered:find("boots")
-    end
-
-    local function setHandleTransparency(handle, value)
-        if handle:IsA("BasePart") then
-            if originalTransparency[handle] == nil then
-                originalTransparency[handle] = handle.Transparency
-            end
-            handle.Transparency = value
-        end
-        for _, child in ipairs(handle:GetDescendants()) do
-            if child:IsA("BasePart") then
-                if originalTransparency[child] == nil then
-                    originalTransparency[child] = child.Transparency
-                end
-                child.Transparency = value
-            end
-        end
-    end
-
-    local function handleArmor(char, transparency)
-        for _, accessory in ipairs(char:GetChildren()) do
-            if accessory:IsA("Accessory") and accessory:FindFirstChild("Handle") then
-                if isArmor(accessory.Name) then
-                    setHandleTransparency(accessory.Handle, transparency)
-                end
-            end
-        end
-    end
-
-    local function setTransparency()
-        if not Transparency.Enabled then return end
-        if not entitylib.isAlive then return end
-
-        local char = getCharacter()
-        if not char then return end
-
-        for partName, slider in pairs(sliders) do
-            local part = char:FindFirstChild(partName)
-            if part then
-                if originalTransparency[part] == nil then
-                    originalTransparency[part] = part.Transparency
-                end
-                part.Transparency = slider.Value
-
-                if partName == "Head" then
-                    local face = part:FindFirstChild("face")
-                    if face and face:IsA("Decal") then
-                        if originalTransparency[face] == nil then
-                            originalTransparency[face] = face.Transparency
-                        end
-                        face.Transparency = slider.Value
-                    end
-                end
-            end
-        end
-
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
-                if obj.Name:lower():find("hair") then
-                    setHandleTransparency(obj.Handle, sliders.Hair.Value)
-                end
-            end
-        end
-
-        if HideArmor.Enabled then
-            handleArmor(char, 1)
-        else
-            handleArmor(char, 0)
-        end
-    end
-
-    Transparency = vape.Categories.Render:CreateModule({
-        Name = 'Transparency',
-        Function = function(callback)
-            if callback then
-                -- Reapplying does full GetChildren/GetDescendants sweeps of the
-                -- character; at 60fps that's hundreds of instance calls a frame.
+		at 60fps that's hundreds of instance calls a frame.
                 -- 10Hz is visually identical (the game only rarely resets
                 -- transparency) and slider callbacks still apply instantly.
                 local nextApply = 0
@@ -8328,7 +7617,6 @@ run(function()
         Default = false
     })
 end)
-
 
 	run(function()
 		local AnimDisabler
@@ -8412,96 +7700,16 @@ run(function()
 		end,
 		Tooltip = 'Framerate cap applied while the module is on'
 	})
-end)
-
-run(function()
-	local FastProxPrompt
-	local Mode
-	local Value
-	local modified = {}
-	local thread
-
-	FastProxPrompt = vape.Categories.World:CreateModule({
-		Name = 'FastProxPrompt',
-		Function = function(callback)
-			if callback then
-				if Mode.Value == 'Signal' then
-					FastProxPrompt:Clean(proxService.PromptButtonHoldBegan:Connect(function(prompt, plr)
-						if plr == lplr then
-							thread = task.delay(prompt.HoldDuration * (Value.Value / 100), function()
-								fireproximityprompt(prompt)
-								thread = nil
-							end)
-						end
-					end))
-
-					FastProxPrompt:Clean(proxService.PromptButtonHoldEnded:Connect(function(prompt, plr)
-						if plr == lplr and thread then
-							task.cancel(thread)
-							thread = nil
-						end
-					end))
-				else
-					FastProxPrompt:Clean(proxService.PromptShown:Connect(function(prompt)
-						if not modified[prompt] then
-							modified[prompt] = prompt.HoldDuration
-						end
-
-						prompt.HoldDuration = modified[prompt] * (Value.Value / 100)
-					end))
-
-					FastProxPrompt:Clean(proxService.PromptHidden:Connect(function(prompt)
-						if modified[prompt] then
-							prompt.HoldDuration = modified[prompt]
-							modified[prompt] = nil
-						end
-					end))
-				end
-			else
-				if thread then
-					task.cancel(thread)
-					thread = nil
-				end
-
-				for i, v in modified do
-					i.HoldDuration = v
-				end
-
-				table.clear(modified)
-			end
-		end,
-		Tooltip = 'Allow you to adjust the HoldDuration time of a ProximityPrompt'
-	})
-	Mode = FastProxPrompt:CreateDropdown({
-		Name = 'Mode',
-		List = {'Signal', 'Property'},
-		Tooltip = 'Signal - Uses fireproximityprompt after the calculated delay\nProperty - Sets the HoldDuration property',
-		Function = function()
-			if FastProxPrompt.Enabled then
-				FastProxPrompt:Toggle()
-				FastProxPrompt:Toggle()
-			end
-		end
-	})
-	Value = FastProxPrompt:CreateSlider({
-		Name = 'Modifier',
-		Min = 0,
-		Max = 100,
-		Default = 50,
-		Suffix = '%',
-		Function = function(val)
-			for i, v in modified do
-				i.HoldDuration = v * (val / 100)
-			end
-		end
-	})
-end)
 
 run(function()
 	local ZoomUnlocker
 	local MaxZoom
 	local zoomConn
 
+	-- This place's StarterPlayer value, which is also what the game's own code writes
+	-- back when it finishes a temporary camera override (the zipline handler restores a
+	-- literal 14). Read off StarterPlayer at runtime so a place update carries the
+	-- restore value with it; the literal is only the fallback.
 	local FALLBACK_MAX_ZOOM = 14
 
 	local function defaultMaxZoom()
@@ -8512,12 +7720,28 @@ run(function()
 		return FALLBACK_MAX_ZOOM
 	end
 
+	-- The game does not leave this property alone, so one write on enable will not hold:
+	-- the zipline handler sets 20 and then hard-restores 14, aiming down a scope sets
+	-- 6.5 and restores whatever it captured, and assorted menu/spectate paths write
+	-- 30/40/100. Re-apply whenever it moves out from under us.
+	--
+	-- Except while the game is PINNING the camera -- aiming and ziplining both set min
+	-- and max to the same value to lock the distance to one number. Fighting those
+	-- breaks the scope and the zipline ride, and there is nothing to fix afterwards:
+	-- both end by restoring a normal min < max, which is the edge that puts our value
+	-- back.
+	--
+	-- Deferred rather than handled inline because those paths write max and min as two
+	-- separate statements. Inline we would see the half-applied state (max = 20, min
+	-- still 0), read it as a normal range, and clobber the pin before it finished
+	-- landing. By the next resumption point both writes are in.
 	local pending = false
 
 	local function applyZoom()
 		pending = false
 		if not (ZoomUnlocker and ZoomUnlocker.Enabled) then return end
 		if lplr.CameraMinZoomDistance >= lplr.CameraMaxZoomDistance then return end
+		-- Guarded so our own write doesn't re-enter through the changed signal below.
 		if lplr.CameraMaxZoomDistance ~= MaxZoom.Value then
 			lplr.CameraMaxZoomDistance = MaxZoom.Value
 		end
@@ -8541,6 +7765,9 @@ run(function()
 					zoomConn = nil
 				end
 				pending = false
+				-- Back to the place default rather than whatever was there when the
+				-- module went on: enabling mid-scope would otherwise capture 6.5 and
+				-- restore that as if it were normal.
 				lplr.CameraMaxZoomDistance = defaultMaxZoom()
 			end
 		end,
@@ -8560,4 +7787,5 @@ run(function()
 		end,
 		Tooltip = 'How far out the camera is allowed to go. 14 is the game default'
 	})
+end)
 end)

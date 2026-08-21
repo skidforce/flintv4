@@ -5,6 +5,7 @@
 -- the gate was skipped. Checked before the uninject below, so a failed check cannot tear down a
 -- working instance on its way out.
 if not shared.SkidV5Authenticated then
+	warn('[skidv5] not authenticated -- run the pistonware loader and enter your key')
 	return
 end
 
@@ -35,16 +36,41 @@ local cloneref = cloneref or function(obj)
 end
 local playersService = cloneref(game:GetService('Players'))
 
+-- Phones and tablets. Used to pace the autosave loop, which is the expensive recurring job on a
+-- device with slow storage.
+--
+-- It used to gate the asset prefetch too, because only the desktop GUI read icons off disk. Both
+-- platforms take icons from uploaded ids now, so there is no prefetch left to gate.
+local isTouchDevice = false
+pcall(function()
+	isTouchDevice = cloneref(game:GetService('UserInputService')).TouchEnabled and true or false
+end)
+
+-- Telemetry the developer build prints and the public build does not.
+--
+-- Module counts and load timings are what you want in front of you while working on the loader,
+-- and noise in a paying user's console -- they are yellow, they say [skidv5], and they turn
+-- up at exactly the moment the script starts working, so they read as something having gone
+-- wrong. Real failures still use warn() directly and are unaffected.
+--
+-- Gated at runtime rather than at build time because main.lua is one file serving both builds.
+-- PUBLIC_BUILD nulls shared.SkidV5Developer and locks it behind a metatable, so this is off
+-- for everyone except the developer build by construction -- and the queued teleport script
+-- carries the flag across, so it stays on for a developer through a match join.
+local function debugWarn(...)
+	if shared.SkidV5Developer then
+		warn(...)
+	end
+end
+
 -- isfile is not the question. A zero-byte file reads back as PRESENT through every executor's
 -- real isfile, and only the fallback above treats empty as absent -- so on executors that ship
 -- one (most of them), an interrupted write leaves a truncated file that nothing ever repairs.
 --
--- That is not hypothetical: cancelling, crashing or teleporting during the concurrent asset
--- prefetch below leaves a half-written PNG. From then on prefetchFolder skips it, downloadFile
--- skips it, getcustomasset hands the corrupt file to the client, and the resulting invalid
--- content id throws 'ContentId formatting failed' at the assignment -- taking the whole GUI
--- chunk with it. Every route that could have fixed it asked isfile and was told the file was
--- fine, which is why the only known remedy was reinstalling the entire script.
+-- That is not hypothetical: cancelling, crashing or teleporting mid-download leaves a
+-- half-written file, and from then on every cache-first route skips it forever. For a .lua file
+-- that means a chunk that never loads. Every route that could have fixed it asked isfile and was
+-- told the file was fine, which is why the only known remedy was reinstalling the whole script.
 --
 -- Treating empty as missing makes it repair itself on the next run instead.
 local function hasContent(path)
@@ -92,100 +118,14 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
--- Standalone progress label for the prefetch phase, since it runs before the GUI framework
--- (and its own downloader label) exists yet.
-local downloaderGui, downloaderLabel
-local function updateDownloader(text)
-	if not downloaderGui then
-		downloaderGui = Instance.new('ScreenGui')
-		downloaderGui.Name = 'SkidV5Downloader'
-		downloaderGui.ResetOnSpawn = false
-		downloaderGui.Parent = cloneref(game:GetService('CoreGui'))
-		downloaderLabel = Instance.new('TextLabel')
-		downloaderLabel.Size = UDim2.new(1, 0, 0, 40)
-		downloaderLabel.BackgroundTransparency = 1
-		downloaderLabel.TextStrokeTransparency = 0
-		downloaderLabel.TextSize = 20
-		downloaderLabel.TextColor3 = Color3.new(1, 1, 1)
-		downloaderLabel.Parent = downloaderGui
-	end
-	downloaderLabel.Text = text
-end
-local function destroyDownloader()
-	if downloaderGui then
-		downloaderGui:Destroy()
-		downloaderGui, downloaderLabel = nil, nil
-	end
-end
-
--- Downloads every file in a repo folder concurrently instead of one HttpGet per getcustomasset call,
--- so GUI construction reads already-cached files instead of blocking on ~190 sequential round trips.
-local function prefetchFolder(folder)
-	local reqSuc, res = pcall(function()
-		return game:HttpGet('https://api.github.com/repos/skidforce/skidv5/contents/'..folder, true)
-	end)
-	if not (reqSuc and res and res ~= '404: Not Found') then return end
-	local bodySuc, body = pcall(function()
-		return cloneref(game:GetService('HttpService')):JSONDecode(res)
-	end)
-	if not (bodySuc and body and typeof(body) == 'table') then return end
-
-	local toFetch = {}
-	for _, v in body do
-		-- hasContent, not isfile: a truncated asset from an interrupted prefetch must be picked
-		-- up again here rather than skipped forever. See the note on hasContent.
-		if v.type == 'file' and not hasContent('skidv5/'..folder..'/'..v.name) then
-			table.insert(toFetch, v.name)
-		end
-	end
-	if #toFetch <= 0 then return end
-
-	local completed, total = 0, #toFetch
-	local done = Instance.new('BindableEvent')
-	updateDownloader('Downloading '..folder..' ('..completed..'/'..total..')')
-
-	-- A fixed pool rather than one task per file. assets/new alone holds 63 files, and a user
-	-- on any other theme prefetches their theme AND assets/new -- so spawning per file put
-	-- 60+ HttpGets in flight at once, each holding its response body, each able to retry four
-	-- times. That is a large memory and socket spike at boot on a device that has not even
-	-- built the GUI yet. Same files, same order, same completion signal; just a ceiling on how
-	-- many are outstanding at once.
-	local PREFETCH_WORKERS = 6
-	local nextIndex = 1
-	local workers = math.min(PREFETCH_WORKERS, total)
-	local active = workers
-
-	for _ = 1, workers do
-		task.spawn(function()
-			while true do
-				-- Claiming an index takes no yield between the read and the increment, so
-				-- two workers can never be handed the same file.
-				local index = nextIndex
-				nextIndex += 1
-				if index > total then break end
-
-				pcall(downloadFile, 'skidv5/'..folder..'/'..toFetch[index])
-				completed += 1
-				-- pcall'd and after the counter: if this ever threw, the worker would die
-				-- before releasing the wait below and the boot would hang on a GUI error
-				pcall(updateDownloader, 'Downloading '..folder..' ('..completed..'/'..total..')')
-			end
-			active -= 1
-			if active <= 0 then
-				done:Fire()
-			end
-		end)
-	end
-	-- Only wait when a worker is still outstanding. task.spawn runs each task inline until it
-	-- yields, so on executors where HttpGet does NOT yield the scheduler every worker drains
-	-- the whole queue inside the loop above -- done:Fire() then lands with nothing listening
-	-- yet, and an unconditional Wait() blocks forever with the label frozen at total/total.
-	-- Same guard the loader's downloaders already use.
-	if active > 0 then
-		done.Event:Wait()
-	end
-	done:Destroy()
-end
+-- The repo-folder listing and the concurrent prefetch that used to live here are gone.
+--
+-- Both existed for one reason: to get pistonware/assets/new onto disk before the GUI started
+-- reading it. The GUI resolves its icons to uploaded rbxassetids now and never opens those
+-- files, so the prefetch was downloading 105 files nothing would read, and the listing spent a
+-- GitHub API call (60/hour, shared per IP, and mobile carriers put thousands of users behind
+-- one) to find out what they were. The handful of paths that still have no uploaded id are
+-- fetched lazily by the GUI, and only if a module that draws one is ever built.
 
 -- False while a game script is still registering its modules on its own thread. A fast game
 -- script sets this back to true before runGameScript even returns, so the common path never
@@ -230,7 +170,7 @@ local function finishLoading()
 		inline until it yields, and only bedwars.lua yields), so this whole block runs
 		synchronously and behaves exactly as it always did.
 	]]
-	local function applyProfile()
+	local function applyProfile(moduleSetComplete)
 		-- A session LuaArmor refused registered no game modules at all (see the session
 		-- block at the top of bedwars.lua). Loading a profile against that empty set would
 		-- bring everything up on defaults, and the Save below would write those defaults
@@ -240,27 +180,117 @@ local function finishLoading()
 			warn('[skidv5] session was not authorised -- leaving profiles untouched')
 			return
 		end
+		debugWarn(('[skidv5] applying profile %s (teleported=%s)'):format(
+			tostring(customProfile or '<saved>'), tostring(shared.vapereload and true or false)))
 		vape:Load(nil, customProfile)
-		profileApplied = true
-		-- Persist the applied profile so a reinject before the first autosave tick still comes
-		-- back to the same config.
-		if customProfile then
-			pcall(function() vape:Save() end)
-		end
-		-- Only now is autosaving safe, and only now is there a profile worth saving.
-		-- The rejection check repeats inside the wait as well as at the top: a key can be
-		-- revoked mid-session, and when that happens bedwars.lua switches every module off.
-		-- Catching the flag only once per cycle would leave up to ten seconds in which this
-		-- loop could persist that switched-off state over a good config.
+		debugWarn('[skidv5] profile load returned')
+
+		--[[
+			Loading an incomplete module set is fine: every module that exists gets its saved
+			settings, and the ones still registering simply arrive later. PERSISTING one is not
+			fine, and this is where mobile configs were being reset.
+
+			waitForModules only reports incomplete when it hit its 120s backstop. On desktop that
+			effectively never happens -- the payload signals long before. On a phone it happens
+			for real, because the LuaArmor VM is slow enough there to run past the deadline. What
+			followed was the destructive half: profileApplied went true, the autosave loop started
+			ten seconds later, and Save() serialised a module list that was still missing most of
+			BedWars -- writing every one of those settings out of the profile permanently.
+
+			So a timed-out load now applies and stops. Nothing is written, the file on disk stays
+			exactly as the user left it, and the modules that arrive late keep their saved values
+			because nothing overwrote them.
+		]]
+		--[[
+			Saving cannot begin until the module set has STOPPED CHANGING, and that is not the
+			same as it being complete.
+
+			vape:Save walks vape.Modules with `next`. While the payload is still loading, the
+			LuaArmor VM is inserting into that same table from another thread, and growing a table
+			mid-iteration is undefined in Lua -- the rehash takes the VM down natively rather than
+			raising something catchable. That is the crash, and it is why the old build refused to
+			save here at all.
+
+			What the old build then got wrong was giving up permanently: it returned, and nothing
+			was ever saved for the rest of the session. A payload that never signals completion --
+			which is any copy on LuaArmor predating the flag at the end of bedwars.lua -- therefore
+			meant a BedWars match where nothing you changed was ever written, while the lobby saved
+			fine because an ordinary game script returns normally.
+
+			So: still never save while modules are arriving, but keep watching instead of giving
+			up. A signal ends the wait immediately; failing that, a module count that has not moved
+			for a while means nothing is inserting any more, which is the only property the walk
+			below actually needs.
+		]]
+		local function startAutosave()
+			profileApplied = true
+			-- Opens the gate on vape:RequestSave, which is what makes a module toggle write the
+			-- profile straight away instead of waiting for the tick below. Nothing may walk
+			-- vape.Modules before this point; that is the crash.
+			vape.SaveReady = true
+			debugWarn('[skidv5] module set settled -- saving on change enabled')
+		--[[
+			A backstop now, not the main mechanism.
+
+			Module toggles write immediately through vape:RequestSave. This loop is what still
+			catches everything else -- a slider nudged, a colour changed, a window dragged -- none
+			of which announce themselves. Left at the same cadence because it is no longer what
+			your on/off states depend on.
+		]]
+		local saveInterval = isTouchDevice and 30 or 10
 		task.spawn(function()
+			--[[
+				One frame off the apply frame, not three seconds.
+
+				What made the teleport path fall over was TWO full serialisations in the frame the
+				profile finished applying -- while modules were still toggling, the Text GUI was
+				rebuilding and the game script was reacting to all of it. Stepping off that frame
+				is the whole fix; waiting three seconds on top of it was not, and it cost the
+				promptness the removed immediate save used to provide.
+
+				Persisting the newly applied profile is not optional: gui.txt only records which
+				profile is active when something saves, so a long gap here is a window in which a
+				reinject comes back on the previous profile.
+			]]
+			task.wait()
 			while vape.Loaded and not shared.SkidV5SessionRejected do
-				vape:Save()
-				for _ = 1, 10 do
+				debugWarn('[skidv5] autosave tick')
+				pcall(function() vape:Save() end)
+				for _ = 1, saveInterval do
 					task.wait(1)
 					if not vape.Loaded or shared.SkidV5SessionRejected then break end
 				end
 			end
 		end)
+		end
+
+		if moduleSetComplete then
+			startAutosave()
+		else
+			warn('[skidv5] the payload never signalled completion -- re-upload games/bedwars.lua to LuaArmor. Waiting for the module list to settle before saving anything.')
+			task.spawn(function()
+				local lastCount, stableSince = -1, os.clock()
+				while vape.Loaded and not shared.SkidV5SessionRejected do
+					if gameScriptFinished or shared.SkidV5BedwarsLoaded then break end
+
+					-- vape.ModuleCount, never a walk of vape.Modules: the whole reason this
+					-- loop exists is that the payload is still inserting into that table.
+					local count = vape.ModuleCount or 0
+					if count ~= lastCount then
+						lastCount = count
+						stableSince = os.clock()
+					elseif os.clock() - stableSince > 30 then
+						break
+					end
+
+					task.wait(2)
+				end
+
+				if vape.Loaded and not shared.SkidV5SessionRejected then
+					startAutosave()
+				end
+			end)
+		end
 	end
 
 	-- Waits until the game script has finished registering its modules, because the profile can
@@ -280,33 +310,42 @@ local function finishLoading()
 	--
 	-- The timeout is a backstop, not a mechanism. It only matters when the payload on LuaArmor
 	-- predates the completion flag; re-upload bedwars.lua and this returns the moment it lands.
+	-- Returns whether the module list is actually COMPLETE, which is not the same as whether
+	-- the wait finished. Hitting the backstop means the payload is still registering, and the
+	-- caller has to know that before it writes anything to disk.
 	local function waitForModules()
-		if gameScriptFinished then return end
+		if gameScriptFinished then return true end
 		local started = os.clock()
 		repeat
 			task.wait(0.1)
 		until gameScriptFinished
 			or shared.SkidV5BedwarsLoaded
 			or os.clock() - started > 120
-		local count = 0
-		for _ in vape.Modules do count += 1 end
+		local complete = (gameScriptFinished or shared.SkidV5BedwarsLoaded) and true or false
+		-- Same reason as the settle-watcher below: on the timeout path the payload is still
+		-- inserting, so this must not walk vape.Modules to count them.
+		local count = vape.ModuleCount or 0
 		local how = shared.SkidV5BedwarsLoaded and 'payload signalled'
 			or gameScriptFinished and 'game script returned'
 			or 'TIMED OUT after 120s -- re-upload bedwars.lua to LuaArmor so it can signal when it is done'
-		warn(('[skidv5] %d modules in %.1fs (%s) -- applying profile'):format(count, os.clock() - started, how))
+		debugWarn(('[skidv5] %d modules in %.1fs (%s) -- applying profile'):format(count, os.clock() - started, how))
+		return complete
 	end
 
 	if gameScriptFinished then
-		applyProfile()
+		applyProfile(true)
 	else
 		task.spawn(function()
-			waitForModules()
-			applyProfile()
+			applyProfile(waitForModules())
 		end)
 	end
 
 	local teleportedServers
-	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function()
+	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function(teleportState)
+		-- A failed teleport is ignored rather than consumed. OnTeleport fires for EVERY state
+		-- and the one-shot guard below does not look at which -- so an attempt that failed used
+		-- to burn it, and the teleport that actually went somewhere afterwards queued nothing.
+		if teleportState == Enum.TeleportState.Failed then return end
 		if (not teleportedServers) and (not shared.VapeIndependent) then
 			teleportedServers = true
 			-- Re-runs main.lua, not the loader. The loader is a full boot -- duplicate-run
@@ -328,16 +367,10 @@ local function finishLoading()
 			-- by hand here. Without it the guard at the top of this file would reject the
 			-- re-injection, and bedwars.lua would be handed to loadstring with no script_key.
 			-- %q so a key containing a quote or backslash still produces a valid chunk.
-			--
-			-- skidv5 has no key gate: the loader sets shared.SkidV5Authenticated directly, and
-			-- the teleport script must re-publish that flag UNCONDITIONALLY -- gating it on
-			-- shared.PistonwareKey (which skidv5 never sets) meant the queued main.lua bailed at
-			-- the auth guard after every teleport and the new game's script never auto-loaded.
 			if shared.PistonwareKey then
 				local quoted = string.format('%q', shared.PistonwareKey)
-				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\n'..teleportScript
+				teleportScript = 'script_key = '..quoted..'\nshared.PistonwareKey = '..quoted..'\nshared.SkidV5Authenticated = true\n'..teleportScript
 			end
-			teleportScript = 'shared.SkidV5Authenticated = true\n'..teleportScript
 			if shared.SkidV5Developer then
 				teleportScript = 'shared.SkidV5Developer = true\n'..teleportScript
 			end
@@ -352,18 +385,40 @@ local function finishLoading()
 			-- queueing before the payload has finished means vape.Profile is not set yet, and
 			-- without this the next server would be told to load 'default'.
 			teleportScript = 'shared.VapeCustomProfile = '..string.format('%q', vape.Profile or customProfile or 'default')..'\n'..teleportScript
-			-- Same rule as everywhere else: saving before the profile has been applied against the
-			-- full module set would write one missing every module still to appear. Queueing
-			-- straight into a match is exactly when that happens, so skip the save rather than
-			-- corrupt the config -- what is on disk is already correct, there is simply nothing
-			-- new worth recording yet.
-			if profileApplied then
-				vape:Save()
-			end
+			--[[
+				Queue FIRST, and guard everything after it.
+
+				The queue call used to be LAST, sitting behind an unguarded vape:Save(). Two
+				things were wrong with that, and together they are the crash people hit when
+				queueing from one match straight into another:
+
+				  * Save() serialises every module and writes a file. This callback runs while
+				    the client is already tearing down for the teleport, and a blocking disk
+				    write in that window is what takes the game down with it -- worst on mobile,
+				    where storage is slowest and the window is shortest.
+				  * Save() was not pcall'd. If it threw, queue_on_teleport never ran at all, so
+				    the script silently failed to come back on the new server. A failure to save
+				    became a failure to re-inject.
+
+				Queueing first makes the re-injection independent of everything that follows.
+				Nothing below can cost you the script any more.
+			]]
+			pcall(queue_on_teleport, teleportScript)
+
 			if not hasQueueOnTeleport then
-				vape:CreateNotification('SkidV5', 'queue_on_teleport is not supported by your executor -- Vape will not re-inject automatically after this teleport (e.g. queueing into a match). You will need to re-run your loadstring manually.', 15, 'alert')
+				pcall(function()
+					vape:CreateNotification('SkidV5', 'queue_on_teleport is not supported by your executor -- Vape will not re-inject automatically after this teleport (e.g. queueing into a match). You will need to re-run your loadstring manually.', 15, 'alert')
+				end)
 			end
-			queue_on_teleport(teleportScript)
+
+			-- Best effort, and last. Same rule as everywhere else: saving before the profile has
+			-- been applied against the full module set would write one missing every module still
+			-- to appear. Queueing straight into a match is exactly when that happens, so skip the
+			-- save rather than corrupt the config -- what is on disk is already correct, there is
+			-- simply nothing new worth recording yet.
+			if profileApplied then
+				pcall(function() vape:Save() end)
+			end
 		end
 	end))
 
@@ -373,27 +428,61 @@ local function finishLoading()
 	end
 
 	if not shared.vapereload then
-		if not vape.Categories then return end
-		if vape.Categories.Main.Options['GUI bind indicator'].Enabled then
-			vape:CreateNotification('SkidV5 | Finished Loading', vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press '..table.concat(vape.Keybind, ' + '):upper()..' to open GUI', 5)
-		end
+		-- Cosmetic, and entirely inside a pcall, because the rewrite moved every field it reads.
+		-- 'GUI bind indicator' left Categories.Main.Options for Settings.GUI.Options, the keybind
+		-- list became GUIBind.Keys instead of a flat vape.Keybind, and vape.VapeButton no longer
+		-- exists at all. A finished-loading toast is not worth risking finishLoading over if any
+		-- of that moves again.
+		pcall(function()
+			if not vape.Categories then return end
+			local indicator = vape.Settings and vape.Settings.GUI and vape.Settings.GUI.Options['GUI bind indicator']
+			if not (indicator and indicator.Enabled) then return end
+			local keys = vape.GUIBind and vape.GUIBind.Keys
+			local how = (keys and #keys > 0)
+				and ('Press '..table.concat(keys, ' + '):upper()..' to open GUI')
+				or 'Open the GUI with your keybind'
+			vape:CreateNotification('Pistonware | Finished Loading', how, 5)
+		end)
 	end
 end
 
-	if not isfile('skidv5/profiles/gui.txt') then
-		writefile('skidv5/profiles/gui.txt', 'new')
-	end
-	local gui = readfile('skidv5/profiles/gui.txt')
+	--[[
+		One GUI now.
 
-	if not isfolder('skidv5/assets/'..gui) then
-		makefolder('skidv5/assets/'..gui)
+		guis/old.lua and guis/rise.lua are discontinued and deleted, so the gui.txt theme
+		indirection has nothing left to choose between -- every value it could hold except one
+		names a file that would 404. Reading it to decide which GUI to load was a way to break the
+		install, not a feature, so the choice is made here instead.
+
+		The asset folder keeps its own separate name: 'new' is the path the GUI itself asks for
+		(pistonware/assets/new/...), and that is unrelated to what the GUI file is called.
+	]]
+	local GUI_FILE = 'newgui'
+	local ASSET_FOLDER = 'new'
+
+	-- Still written, so anything else reading gui.txt sees something current rather than a
+	-- stale 'rise'/'old' left over from before those were removed.
+	pcall(function() writefile('skidv5/profiles/gui.txt', GUI_FILE) end)
+
+	--[[
+		No asset prefetch, and nothing to prefetch for.
+
+		The GUI now resolves every icon it draws to an uploaded rbxassetid and never opens a file
+		under pistonware/assets. This used to download the whole folder -- 105 files, 105 HTTP
+		requests and 105 disk writes -- on the critical path of the first run, on every platform,
+		and the desktop GUI then read each of those files back twice per icon.
+
+		A few paths that only game modules ask for still have no uploaded id, so the GUI keeps a
+		lazy fallback for exactly those: downloaded the first time a module that draws one is
+		built, not here, and not for anyone who never opens it. Prefetching 105 files to serve
+		five of them was the expensive way round.
+
+		The folder is still created, because that lazy fallback writes into it.
+	]]
+	if not isfolder('skidv5/assets/'..ASSET_FOLDER) then
+		makefolder('skidv5/assets/'..ASSET_FOLDER)
 	end
-	pcall(prefetchFolder, 'assets/'..gui)
-	if gui ~= 'new' then
-		pcall(prefetchFolder, 'assets/new')
-	end
-	destroyDownloader()
-	vape = loadstring(downloadFile('skidv5/guis/'..gui..'.lua'), 'gui')()
+	vape = loadstring(downloadFile('skidv5/guis/'..GUI_FILE..'.lua'), 'gui')()
 	shared.vape = vape
 
 if not shared.VapeIndependent then
@@ -475,7 +564,7 @@ if not shared.VapeIndependent then
 			-- instead of guessed at.
 			local elapsed = os.clock() - started
 			if elapsed > 5 then
-				warn(('[skidv5] %s finished in %.1fs -- its modules now have their saved settings'):format(chunkname, elapsed))
+				debugWarn(('[skidv5] %s finished in %.1fs -- its modules now have their saved settings'):format(chunkname, elapsed))
 			end
 			if not ok then
 				warn('[skidv5] '..chunkname..' errored: '..tostring(err))
